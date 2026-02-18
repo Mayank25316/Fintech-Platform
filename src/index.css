@@ -22,13 +22,13 @@ a:hover {
   color: #535bf2;
 }
 
-body {
+/* body {
   margin: 0;
   display: flex;
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
-}
+} */
 
 h1 {
   font-size: 3.2em;
@@ -65,4 +65,39 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
+}
+
+.nav-link{
+  padding : 20px;
+  margin-right: 25px;
+}
+.navbar-nav{
+  text-align: right;
+}
+.footer-link {
+    color: #666 !important;
+    font-weight: 400;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.footer-link:hover {
+    color: #387ed1 !important; /* Changes to blue when hovered like the real site */
+}
+.bottomLinks {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+
+/* This targets every 'a' tag INSIDE .bottomLinks */
+.bottomLinks a {
+    color: #9b9b9b;
+    text-decoration: none;
+    font-size: 0.8rem;
+}
+
+/* You can even handle hovers for all of them at once! */
+.bottomLinks a:hover {
+    color: #387ed1;
 }
