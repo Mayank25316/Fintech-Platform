@@ -270,22 +270,19 @@ code {
   justify-content: space-evenly;
 }
 
-/* Updated styles below */
 .menus ul {
   list-style-type: none;
-  margin: 0;       /* Removes default browser margin */
-  padding: 0;      /* Removes default browser padding */
-  display: flex;   /* Uses flexbox for the list items */
+  margin: 0;       
+  padding: 0;      
+  display: flex;  
   align-items: center; 
 }
 
 .menus li {
   margin-right: 30px;
   text-decoration: none;
-  /* Removed inline-block since the parent ul is now a flex container */
 }
 
-/* Target the paragraph tags inside the list to remove their default margin */
 .menus li p {
   margin: 0; 
 }
@@ -308,7 +305,6 @@ hr {
 .profile {
   display: flex;
   align-items: center;
-  /* Removed justify-content: space-evenly; as the gap/margin handles spacing better here */
 }
 
 .profile .avatar {
@@ -317,23 +313,20 @@ hr {
   align-items: center;
   width: 30px;
   height: 30px;
-  border-radius: 50%; /* 50% is standard for perfect circles */
+  border-radius: 50%; 
   background: rgb(252, 229, 252);
   color: rgb(221, 139, 221);
   font-size: 0.7rem;
-  font-weight: 500; /* Bumped slightly so it's readable */
+  font-weight: 500; 
   margin-right: 10px;
-  
-  /* Cleaned up redundant text-align and position properties */
 }
 
 .profile .username {
   font-size: 0.8rem;
   font-weight: 300;
   color: rgb(70, 70, 70);
-  margin: 0; /* CRITICAL: Removes default paragraph margin */
+  margin: 0; 
 }
-/* sudo selectors */
 
 .menu:hover {
   color: rgb(245, 104, 52);
