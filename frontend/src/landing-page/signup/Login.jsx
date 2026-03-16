@@ -1,36 +1,34 @@
-import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useState } from 'react';
 import axios from 'axios';
 
-export default function Signup() {
+export default function Login() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [username, setUsername] = useState('');
 
     const navigate = useNavigate();
 
-    const handleSignup = async (e) => {
-        e.preventDefault(); 
+    const handleLogin = async (e) => {
+        e.preventDefault();
 
         try {
             const response = await axios.post(
-                "http://localhost:3000/signup",
-                { username, email, password },
-                { withCredentials: true }
+                "http://localhost:3000/login",
+                { email, password },
+                { withCredentials: true } 
             );
 
             if (response.data.success) {
-                alert("Signup Successful! Redirecting to Dashboard...");
-
+                alert("Login Successful! Welcome back.");
                 setTimeout(() => {
-                window.location.href = import.meta.env.VITE_DASHBOARD_URL;
+                    window.location.href = import.meta.env.VITE_DASHBOARD_URL;
                 }, 500);
             } else {
                 alert(response.data.message); 
             }
         } catch (error) {
-            console.error("Signup error:", error);
-            alert("Something went wrong!");
+            console.error("Login error:", error);
+            alert("Invalid Email or Password!");
         }
     };
 
@@ -41,23 +39,10 @@ export default function Signup() {
                     <div className="card-body p-5">
 
                         <h2 className="text-center mb-4 fw-bold" style={{ color: "#387ed1" }}>
-                            Create ZERODHA Account
+                            Login to ZERODHA
                         </h2>
 
-                        <form onSubmit={handleSignup}>
-
-                            <div className="form-floating mb-3">
-                                <input
-                                    type="text"
-                                    className="form-control"
-                                    id="floatingUsername"
-                                    placeholder="Username"
-                                    value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
-                                    required
-                                />
-                                <label htmlFor="floatingUsername" className="text-muted">Username</label>
-                            </div>
+                        <form onSubmit={handleLogin}>
 
                             <div className="form-floating mb-3">
                                 <input
@@ -90,20 +75,20 @@ export default function Signup() {
                                 className="btn w-100 py-3 fw-bold text-white rounded-3 shadow-sm"
                                 style={{ backgroundColor: "#387ed1", transition: "0.3s" }}
                             >
-                                Sign Up
+                                Login
                             </button>
 
                         </form>
 
                         <div className="text-center mt-4">
                             <p className="text-muted mb-0">
-                                Already have an account?{" "}
+                                Don't have an account?{" "}
                                 <Link
-                                    to="/login"
+                                    to="/signup"
                                     className="text-decoration-none fw-semibold"
                                     style={{ color: "#387ed1" }}
                                 >
-                                    Login here
+                                    Sign up here
                                 </Link>
                             </p>
                         </div>
@@ -111,5 +96,6 @@ export default function Signup() {
                     </div>
                 </div>
             </div>
-        </div>);
+        </div>
+    );
 }

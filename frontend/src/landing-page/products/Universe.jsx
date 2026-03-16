@@ -4,6 +4,8 @@ import tijori from "../../assets/Media/tijori.svg";
 import streakLogo from "../../assets/Media/streakLogo.png";
 import smallcaseLogo from "../../assets/Media/smallcaseLogo.png";
 import dittoLogo from "../../assets/Media/dittoLogo.png";
+import { Link } from "react-router-dom";
+
 
 export default function Universe(){
     return(
@@ -38,7 +40,7 @@ export default function Universe(){
                     <p className="text-muted mt-4 px-5" style={{fontSize:"12px"}}>Personalized advice on life and health insurance. No spam and no mis-selling.</p>
                 </div>
                 <div className="col-12 mt-4">
-            <button className="btn btn-primary p-2 fs-5" style={{width:"20%",margin : "0 auto"}}>Sign up for free</button>
+                    <Link to="/signup" className="btn btn-primary p-2 fs-5" style={{width:"20%",margin : "0 auto"}}>Sign up for free</Link>
                 </div>
             </div>
         </div>
