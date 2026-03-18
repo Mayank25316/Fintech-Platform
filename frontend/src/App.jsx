@@ -8,6 +8,7 @@ import SupportPage from './landing-page/support/SupportPage';
 import Navbar from "./landing-page/Navbar";
 import Footer from "./landing-page/Footer";
 import NotFound from "./landing-page/NotFound";
+import Login from "./landing-page/signup/Login";
 
 function App() {
 
@@ -17,6 +18,7 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage/>}/>
         <Route path="/signup" element={<Signup/>}/>
+        <Route path="/login" element={<Login />} />
         <Route path="/product" element={<ProductPage/>}/>
         <Route path="/pricing" element={<PricingPage/>}/>
         <Route path="/about" element={<AboutPage/>}/>
