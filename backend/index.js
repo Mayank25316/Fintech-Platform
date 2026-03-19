@@ -148,8 +148,9 @@ app.post("/login", async (req, res) => {
         });
 
         res.cookie("token", token, {
-            withCredentials: true,
-            httpOnly: false,
+            httpOnly: true,
+            secure: true, 
+            sameSite: "none",
         });
 
         res.status(201).json({ message: "User logged in successfully", success: true });
@@ -198,6 +199,8 @@ app.get("/api/quotes", async (req, res) => {
     } catch (error) {
         console.error("Backend Error fetching bulk data:", error.message);
         const fallbackPricesMap = {
+            "^NSEI": { price: 23002.15, change: 775.65, changePercent: -3.26 }, 
+            "^BSESN": { price: 74207.24, change: -2496.89, changePercent: -3.26 },
             "INFY": { price: 1450.50, change: 15.20, changePercent: 1.25 },
             "TCS": { price: 3850.00, change: -12.50, changePercent: -0.45 },
             "RELIANCE": { price: 2900.20, change: 25.10, changePercent: 0.80 },
