@@ -1,5 +1,5 @@
 import zerodhaFundhouse from "../../assets/Media/zerodhaFundhouse.png";
-import SensibullLogo from "../../assets/Media/SensibullLogo.svg";
+import sensibullLogo from "../../assets/Media/sensibullLogo.svg";
 import tijori from "../../assets/Media/tijori.svg";
 import streakLogo from "../../assets/Media/streakLogo.png";
 import smallcaseLogo from "../../assets/Media/smallcaseLogo.png";
@@ -20,7 +20,7 @@ export default function Universe(){
                     <p className="text-muted mt-4 px-5" style={{fontSize:"12px"}}>Our asset management venture that is creating simple and transparent index funds to help you save for your goals.</p>
                 </div>
                 <div className="col-4 p-3 mt-5">
-                    <img src={SensibullLogo} style={{height:"50px"}}/>
+                    <img src={sensibullLogo} style={{height:"50px"}}/>
                     <p className="text-muted mt-4 px-5" style={{fontSize:"12px"}}>Options trading platform that lets you create strategies, analyze positions, and examine data points like open interest, FII/DII, and more.</p>
                 </div>
                 <div className="col-4 p-3 mt-5">

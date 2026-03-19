@@ -1,5 +1,3 @@
-import React from 'react';
-
 export default function SupportPage() {
     // Data for the Accordion (Left Side)
     const menuItems = [

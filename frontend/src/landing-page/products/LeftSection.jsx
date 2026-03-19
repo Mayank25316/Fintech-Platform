@@ -1,5 +1,5 @@
 import googlePlayBadge from "../../assets/Media/googlePlayBadge.svg";
-import appStoreBadge from "../../assets/Media/appStoreBadge.svg";
+import appstoreBadge from "../../assets/Media/appstoreBadge.svg";
 
 export default function LeftSection({imgURL, productTitle, productDesc, tryDemo, tryDemoText, learnMoreText, learnMore, googlePlay, appStore}){
     return(
@@ -18,7 +18,7 @@ export default function LeftSection({imgURL, productTitle, productDesc, tryDemo,
                     </div>
                     <div className="mt-3">
                         <a href={googlePlay}><img src={googlePlayBadge} style={{marginRight:"25px"}}/></a>
-                        <a href={appStore}><img src={appStoreBadge}/></a>
+                        <a href={appStore}><img src={appstoreBadge}/></a>
                     </div>
                     
                 </div>
