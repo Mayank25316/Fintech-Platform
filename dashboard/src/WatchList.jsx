@@ -7,15 +7,15 @@ export default function WatchList(){
   const { livePrices } = useLiveDataContext();
 
   const data = {
-    labels: watchlist.map((stock) => stock.name),
+    labels: Array.isArray(watchlist) ? watchlist.map((stock) => stock.name) : [],
     
     datasets: [
       {
         label: 'Price',
-        data: watchlist.map((stock) => {
+        data: Array.isArray(watchlist) ? watchlist.map((stock) => {
           const currentData = livePrices[stock.name];
           return currentData ? currentData.price : stock.price; 
-        }),
+        }) : [],
         backgroundColor: [
           'rgba(43, 89, 195, 0.8)',   
           'rgba(43, 144, 143, 0.8)',  
@@ -48,12 +48,12 @@ export default function WatchList(){
           placeholder="Search eg:infy, bse, nifty fut weekly, gold mcx"
           className="search"
         />
-        <span className="counts">{watchlist.length}/50</span>
+        <span className="counts">{Array.isArray(watchlist) ? watchlist.length : 0}/50</span>
       </div>
       <ul className="list">
-        {watchlist.map((stock, index)=>{
+        {Array.isArray(watchlist) ? watchlist.map((stock, index)=>{
           return <WatchlistItem stock={stock} key={index} liveData={livePrices[stock.name]}/>
-        })}
+        }) : null}
       </ul>
       <DoughnutChart data={data}/>
     </div>

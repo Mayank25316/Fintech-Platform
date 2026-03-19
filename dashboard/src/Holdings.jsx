@@ -36,13 +36,13 @@ export default function Holdings(){
         datasets: [
             {
                 label: 'Stock Price',
-                data: holdings.map((stock) => livePrices[stock.name] ? livePrices[stock.name].price : stock.price),
+                data: Array.isArray(holdings) ? holdings.map((stock) => livePrices[stock.name] ? livePrices[stock.name].price : stock.price) : [],
                 backgroundColor: 'rgba(222, 20, 87, 0.66)',
                 yAxisID: 'y',
             },
             {
                 label: 'Stock Qty',
-                data: holdings.map((stock) => stock.qty),
+                data: Array.isArray(holdings) ? holdings.map((stock) => stock.qty) : [],
                 backgroundColor: 'rgba(26, 132, 232, 0.87)',
                 yAxisID: 'y1',
             },
@@ -52,7 +52,7 @@ export default function Holdings(){
 
   return (
     <>
-      <h3 className="title">Holdings ({holdings.length})</h3>
+      <h3 className="title">Holdings ({Array.isArray(holdings) ? holdings.length : 0})</h3>
 
       <div className="order-table">
         <table>
@@ -69,7 +69,7 @@ export default function Holdings(){
           </tr>
           </thead>
           <tbody>
-          {holdings.map((stock, index)=>{
+          { Array.isArray(holdings) ? holdings.map((stock, index)=>{
             const currentData = livePrices[stock.name];
               const currentPrice = currentData ? currentData.price : stock.price;
               const dayChange = currentData ? currentData.changePercent.toFixed(2) : stock.day;
@@ -94,7 +94,7 @@ export default function Holdings(){
                   <td className={dayClass}>{dayChange}%</td>
           </tr>
             );
-          })}
+          }) : null}
           </tbody>
         </table>
       </div>

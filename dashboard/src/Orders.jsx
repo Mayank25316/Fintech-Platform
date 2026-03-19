@@ -29,7 +29,7 @@ export default function Orders() {
             <th>Price</th>
             <th>Mode</th>
           </tr>
-          {orders.map((stock, index) => {
+          {Array.isArray(orders) ? orders.map((stock, index) => {
             return (
               <tr key={index}>
                 <td>{stock.name}</td>
@@ -38,7 +38,7 @@ export default function Orders() {
                 <td>{stock.mode}</td>
               </tr>
             );
-          })}
+          }):null}
         </table>
       </div>
     </div>

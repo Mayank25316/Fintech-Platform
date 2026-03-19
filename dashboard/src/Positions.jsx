@@ -40,7 +40,7 @@ export default function Positions() {
             </tr>
           </thead>
           <tbody>
-            {positions.map((stock, index) => {
+            {Array.isArray(positions) ? positions.map((stock, index) => {
               const currentData = livePrices[stock.name];
               const currentPrice = currentData ? currentData.price : stock.price;
               
@@ -66,7 +66,7 @@ export default function Positions() {
                   <td className={dayClass}>{dayChange}%</td>
                 </tr>
               );
-            })}
+            }) : null}
           </tbody>
         </table>
       </div>
