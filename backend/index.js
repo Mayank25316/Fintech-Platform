@@ -22,7 +22,12 @@ app.use(bodyParser.json());
 
 app.use(
     cors({
-        origin: ["http://localhost:5173", "http://localhost:5174"],
+        origin: [
+            "https://fintech-platform-coci.vercel.app",
+            "https://fintech-platform-umber.vercel.app",
+            "http://localhost:5173",
+            "http://localhost:5174"
+        ],
         methods: ["GET", "POST", "PUT", "DELETE"],
         credentials: true,
     })
@@ -37,7 +42,7 @@ app.get('/', (req, res) => {
 
 app.get('/holdings', userVerification, async (req, res) => {
     try {
-        let userHoldings = await HoldingsModel.find({ user: req.userId }); 
+        let userHoldings = await HoldingsModel.find({ user: req.userId });
         res.json(userHoldings);
     } catch (error) {
         console.error("Error fetching holdings:", error);
