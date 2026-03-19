@@ -16,9 +16,11 @@ export default function Funds() {
   const openingBalance = 100000.00;
 
   let usedMargin = 0;
-  holdings.forEach((stock) => {
-    usedMargin += stock.avg * stock.qty;
-  });
+  if (Array.isArray(holdings)) {
+    holdings.forEach((stock) => {
+        usedMargin += stock.avg * stock.qty;
+    });
+}
 
   const availableMargin = openingBalance - usedMargin;
 

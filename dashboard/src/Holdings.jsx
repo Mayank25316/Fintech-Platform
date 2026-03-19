@@ -17,17 +17,19 @@ export default function Holdings(){
     let totalInvestment = 0;
   let totalCurrentValue = 0;
 
-  holdings.forEach((stock) => {
-    const currentPrice = livePrices[stock.name] ? livePrices[stock.name].price : stock.price;
-    totalInvestment += stock.avg * stock.qty;
-    totalCurrentValue += currentPrice * stock.qty;
-  });
+  if (Array.isArray(holdings)) {
+    holdings.forEach((stock) => {
+      const currentPrice = livePrices[stock.name] ? livePrices[stock.name].price : stock.price;
+      totalInvestment += stock.avg * stock.qty;
+      totalCurrentValue += currentPrice * stock.qty;
+    });
+  }
 
   const totalPnL = totalCurrentValue - totalInvestment;
   const pnlPercentage = totalInvestment > 0 ? (totalPnL / totalInvestment) * 100 : 0;
   const isTotalProfit = totalPnL >= 0;
 
-    const labels = holdings.map((stock)=>stock.name);
+    const labels = Array.isArray(holdings) ? holdings.map((stock) => stock.name) : [];
     
     const data = {
         labels,
