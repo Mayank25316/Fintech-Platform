@@ -20,7 +20,7 @@ export const LiveDataContextProvider = ({ children }) => {
                 const encodedSymbols = encodeURIComponent(symbolsList);
 
                 if (symbolsList.length > 0) {
-                    const response = await axios.get(`http://localhost:3000/api/quotes?symbols=${encodedSymbols}`);
+                    const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/quotes?symbols=${encodedSymbols}`);
                     if (response.data.success) {
                         setLivePrices(response.data.data);
                     }

@@ -5,7 +5,7 @@ export default function Orders() {
   const [orders, setOrders] = useState([]);
 
   useEffect(() => {
-    axios.get("http://localhost:3000/allorders", { withCredentials: true }).then((res) => {
+    axios.get(`${import.meta.env.VITE_API_URL}/allorders`, { withCredentials: true }).then((res) => {
       const today = new Date().toISOString().split('T')[0];
       const todaysOrders = res.data.filter((order) => {
         if (!order.createdAt) return true; 

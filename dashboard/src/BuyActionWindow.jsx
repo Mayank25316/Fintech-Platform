@@ -23,7 +23,7 @@ export default function BuyActionWindow({ uid }) {
     const handleBuyClick = async () => {
         try {
             const response = await axios.post(
-                "http://localhost:3000/newOrder",
+                `${import.meta.env.VITE_API_URL}/newOrder`,
                 {
                     name: uid,
                     qty: Number(stockQty), 
@@ -63,7 +63,7 @@ export default function BuyActionWindow({ uid }) {
             </div>
 
             <div className="buttons">
-                <span>Margin required ₹140.65</span>
+                <span>Margin Required : {marginRequired}</span>
                 <div>
                     <Link className="btn btn-blue" onClick={handleBuyClick}>Buy</Link>
                     <Link className="btn btn-grey" onClick={handleCancelClick}>Cancel</Link>

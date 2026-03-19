@@ -35,9 +35,14 @@ app.get('/', (req, res) => {
     res.send('Hello World!')
 })
 
-app.get('/holdings', async (req, res) => {
-    let allHolding = await HoldingsModel.find({});
-    res.json(allHolding);
+app.get('/holdings', userVerification, async (req, res) => {
+    try {
+        let userHoldings = await HoldingsModel.find({ user: req.userId }); 
+        res.json(userHoldings);
+    } catch (error) {
+        console.error("Error fetching holdings:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
 });
 
 app.get('/positions', async (req, res) => {

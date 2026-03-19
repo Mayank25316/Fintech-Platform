@@ -6,7 +6,7 @@ export default function Funds() {
   const [holdings, setHoldings] = useState([]);
 
   useEffect(() => {
-    axios.get("http://localhost:3000/holdings", { withCredentials: true })
+    axios.get(`${import.meta.env.VITE_API_URL}/holdings`, { withCredentials: true })
       .then((res) => {
         setHoldings(res.data);
       })

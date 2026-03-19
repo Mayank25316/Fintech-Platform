@@ -7,7 +7,7 @@ export default function Summary() {
   const { livePrices } = useLiveDataContext();
 
   useEffect(() => {
-    axios.get("http://localhost:3000/holdings").then((res) => {
+    axios.get(`${import.meta.env.VITE_API_URL}/holdings`).then((res) => {
       setHoldings(res.data);
     });
   }, []);

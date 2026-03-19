@@ -7,7 +7,7 @@ export default function Positions() {
   const { livePrices } = useLiveDataContext();
 
   useEffect(() => {
-    axios.get("http://localhost:3000/allorders", { withCredentials: true })
+    axios.get(`${import.meta.env.VITE_API_URL}/allorders`, { withCredentials: true })
       .then((res) => {
         const today = new Date().toISOString().split('T')[0];
 
