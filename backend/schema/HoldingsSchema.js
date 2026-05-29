@@ -7,9 +7,10 @@ const HoldingsSchema = new Schema({
     price: Number,
     net: String,
     day: String,
+    isLoss: { type: Boolean, default: false },
     user: {
         type: Schema.Types.ObjectId,
-        ref: "UserModel", 
+        ref: "UserModel",
         required: true
     }
 });
