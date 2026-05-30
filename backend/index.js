@@ -119,10 +119,32 @@ const STATIC_FALLBACK = {
 
 
 // ── Holdings Route ────────────────────────────────────────────────────────────
-// Per-user query via userId FK. Returns [] if none found — no side-effects.
+// Per-user query via userId FK.
+// Auto-seeds portfolio for existing users who pre-date the seeding feature
+// (they have 0 holdings AND 0 orders — i.e., a genuinely empty account).
 app.get("/api/holdings", userVerification, async (req, res) => {
     try {
-        const holdings = await HoldingsModel.find({ userId: req.user._id }).lean();
+        const userId  = req.user._id;
+        let holdings  = await HoldingsModel.find({ userId }).lean();
+
+        if (holdings.length === 0) {
+            // Check if they've ever traded — if yes, empty holdings = they sold everything (don't re-seed)
+            const orderCount = await OrdersModel.countDocuments({ user: userId });
+            if (orderCount === 0) {
+                // Genuinely unseeded legacy account — seed now and return fresh data
+                console.log(`[AUTO-SEED] No holdings for ${userId} — seeding portfolio on first access`);
+                await seedUserPortfolio(userId);
+                holdings = await HoldingsModel.find({ userId }).lean();
+
+                // Also initialise fundsAvailable if it was never set (legacy user)
+                const userDoc = await UserModel.findById(userId).select("fundsAvailable");
+                if (!userDoc?.fundsAvailable) {
+                    await UserModel.findByIdAndUpdate(userId, { $set: { fundsAvailable: 100000 } });
+                    console.log(`[AUTO-SEED] Initialised fundsAvailable=100000 for ${userId}`);
+                }
+            }
+        }
+
         res.json(holdings);
     } catch (error) {
         console.error("Error fetching holdings:", error);
