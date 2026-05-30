@@ -26,7 +26,7 @@ export default function Holdings() {
         const refetch = async () => {
             try {
                 const res = await axios.get(
-                    `${import.meta.env.VITE_API_URL}/holdings`,
+                    `${import.meta.env.VITE_API_URL}/api/holdings`,
                     { withCredentials: true }
                 );
                 if (!cancelled) setHoldings(Array.isArray(res.data) ? res.data : []);

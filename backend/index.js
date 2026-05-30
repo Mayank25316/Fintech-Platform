@@ -57,7 +57,7 @@ app.get("/", (req, res) => { res.send("Hello World!"); });
 
 // ── Holdings Route ────────────────────────────────────────────────────────────
 // Per-user query via userId FK. Returns [] if none found — no side-effects.
-app.get("/holdings", userVerification, async (req, res) => {
+app.get("/api/holdings", userVerification, async (req, res) => {
     try {
         const holdings = await HoldingsModel.find({ userId: req.user._id }).lean();
         res.json(holdings);
@@ -68,7 +68,7 @@ app.get("/holdings", userVerification, async (req, res) => {
 });
 
 // ── Positions Route ───────────────────────────────────────────────────────────
-app.get("/positions", async (req, res) => {
+app.get("/api/positions", async (req, res) => {
     try {
         const allPositions = await PositionsModel.find({});
         res.json(allPositions);
@@ -78,40 +78,70 @@ app.get("/positions", async (req, res) => {
     }
 });
 
-// ── New Order Route ───────────────────────────────────────────────────────────
+// ── New Order Route (/api/newOrder) ─────────────────────────────────────────────────
 // Returns the FULL updated holdings array after trade so the frontend can
 // call setHoldings() immediately — no separate GET needed.
-app.post("/newOrder", userVerification, async (req, res) => {
+app.post("/api/newOrder", userVerification, async (req, res) => {
+    // ── Debug: log incoming request for server-side tracing ──────────────────
+    console.log("[newOrder] user  :", req.user ? `${req.user._id} (${req.user.username})` : "MISSING");
+    console.log("[newOrder] body  :", req.body);
+
     try {
+        // ── Explicit auth guard (belt-and-suspenders; userVerification already ran) ──
+        if (!req.user || !req.user._id) {
+            return res.status(401).json({ success: false, message: "Unauthorized — please log in again" });
+        }
+
         const { name, qty, price, mode } = req.body;
         const userId = req.user._id;
 
         // ── Input validation ────────────────────────────────────────────────────
-        if (!name || !qty || !price || !mode) {
-            return res.status(400).json({ success: false, message: "Missing required fields" });
+        if (!name || qty === undefined || price === undefined || !mode) {
+            return res.status(400).json({ success: false, message: "Missing required fields: name, qty, price, mode" });
         }
         const numQty   = Number(qty);
         const numPrice = Number(price);
         if (isNaN(numQty)   || numQty   <= 0) return res.status(400).json({ success: false, message: "Quantity must be a positive number" });
         if (isNaN(numPrice) || numPrice <= 0) return res.status(400).json({ success: false, message: "Price must be a positive number" });
+        if (!["BUY", "SELL"].includes(mode))  return res.status(400).json({ success: false, message: "Invalid mode — must be BUY or SELL" });
 
-        const marginRequired = numQty * numPrice;
+        const totalCost = parseFloat((numQty * numPrice).toFixed(2));
+
+        // Runtime funds default — handles legacy users created before fundsAvailable
+        // was added to the schema (undefined falls back to ₹1,00,000)
+        const currentFunds = typeof req.user.fundsAvailable === "number"
+            ? req.user.fundsAvailable
+            : 100000;
 
         // ── BUY flow ────────────────────────────────────────────────────────────
         if (mode === "BUY") {
-            // 1. Funds check
-            if (req.user.fundsAvailable < marginRequired) {
+            if (currentFunds < totalCost) {
                 return res.status(400).json({
                     success: false,
-                    message: `Insufficient funds. Required: ₹${marginRequired.toFixed(2)}, Available: ₹${req.user.fundsAvailable.toFixed(2)}`,
+                    message: `Order failed: insufficient funds. Required ₹${totalCost.toFixed(2)}, available ₹${currentFunds.toFixed(2)}`,
                 });
             }
 
-            // 2. Deduct funds
-            req.user.fundsAvailable = parseFloat((req.user.fundsAvailable - marginRequired).toFixed(2));
-            await req.user.save();
+            // Atomic deduction.
+            // Pipeline form: coerce null/undefined fundsAvailable to 100000 for legacy users,
+            // then subtract totalCost — all in one DB round-trip.
+            const updatedUser = await UserModel.findByIdAndUpdate(
+                userId,
+                [{ $set: {
+                    fundsAvailable: {
+                        $subtract: [
+                            { $ifNull: ["$fundsAvailable", 100000] },
+                            totalCost
+                        ]
+                    }
+                }}],
+                { new: true }
+            );
+            if (!updatedUser) {
+                return res.status(500).json({ success: false, message: "Order failed: could not update user funds in database" });
+            }
 
-            // 3. Upsert holding — single atomic findOneAndUpdate avoids race conditions
+            // Upsert holding
             const existing = await HoldingsModel.findOne({ name, userId });
             if (existing) {
                 const newQty = existing.qty + numQty;
@@ -127,59 +157,80 @@ app.post("/newOrder", userVerification, async (req, res) => {
                 });
             }
 
+            // Refresh req.user so the response returns accurate fundsAvailable
+            req.user = updatedUser;
+
         // ── SELL flow ───────────────────────────────────────────────────────────
-        } else if (mode === "SELL") {
-            // 1. Ownership-verified holding lookup (userId ensures ownership)
+        } else {
             const existing = await HoldingsModel.findOne({ name, userId });
             if (!existing) {
-                return res.status(400).json({ success: false, message: `No holding found for ${name} in your portfolio` });
+                return res.status(400).json({ success: false, message: `Order failed: no holding found for ${name} in your portfolio` });
             }
             if (numQty > existing.qty) {
                 return res.status(400).json({
                     success: false,
-                    message: `Insufficient quantity. You hold ${existing.qty} unit(s) of ${name}, tried to sell ${numQty}`,
+                    message: `Order failed: insufficient quantity. You hold ${existing.qty} unit(s) of ${name}, tried to sell ${numQty}`,
                 });
             }
 
-            // 2. Mutate holding FIRST (before touching funds — atomic ordering)
+            // Mutate holding FIRST — then credit funds (atomic ordering)
             const remainingQty = existing.qty - numQty;
             if (remainingQty <= 0) {
-                await HoldingsModel.deleteOne({ _id: existing._id, userId }); // ownership check in delete
+                await HoldingsModel.deleteOne({ _id: existing._id, userId });
             } else {
                 existing.qty = remainingQty;
                 await existing.save();
             }
 
-            // 3. Credit funds
-            const proceeds = numQty * numPrice;
-            req.user.fundsAvailable = parseFloat((req.user.fundsAvailable + proceeds).toFixed(2));
-            await req.user.save();
-
-        } else {
-            return res.status(400).json({ success: false, message: "Invalid order mode. Use BUY or SELL." });
+            const proceeds = parseFloat((numQty * numPrice).toFixed(2));
+            // Pipeline form: coerce null/undefined fundsAvailable to 100000, then credit proceeds.
+            const updatedUser = await UserModel.findByIdAndUpdate(
+                userId,
+                [{ $set: {
+                    fundsAvailable: {
+                        $add: [
+                            { $ifNull: ["$fundsAvailable", 100000] },
+                            proceeds
+                        ]
+                    }
+                }}],
+                { new: true }
+            );
+            if (!updatedUser) {
+                return res.status(500).json({ success: false, message: "Order failed: could not credit proceeds to user account" });
+            }
+            req.user = updatedUser;
         }
 
-        // ── Save order record ────────────────────────────────────────────────────
+        // ── Save order record ─────────────────────────────────────────────────
         await OrdersModel.create({ name, qty: numQty, price: numPrice, mode, user: userId, createdAt: new Date() });
 
-        // ── Return FULL updated holdings array ───────────────────────────────────
-        // Frontend calls setHoldings(updatedHoldings) immediately — no extra GET.
+        // ── Return full updated holdings array ────────────────────────────────
         const updatedHoldings = await HoldingsModel.find({ userId }).lean();
 
+        const newFunds = parseFloat((req.user.fundsAvailable ?? 0).toFixed(2));
+        console.log("[newOrder] success — fundsAvailable now:", newFunds);
+
         res.json({
-            success: true,
-            message: "Order placed successfully",
-            updatedHoldings,                       // full array for immediate state sync
-            fundsAvailable: req.user.fundsAvailable,
+            success:          true,
+            message:          "Order placed successfully",
+            updatedHoldings,
+            fundsAvailable:   newFunds,
         });
     } catch (error) {
-        console.error("[newOrder] Error:", error);
-        res.status(500).json({ success: false, message: `Server Error: ${error.message}` });
+        console.error("[newOrder] Unhandled exception:", error.name, "|", error.message);
+        // Never return a bare 500 — always include a human-readable message
+        const friendly = error.name === "ValidationError"
+            ? `Order failed: validation error — ${Object.values(error.errors).map(e => e.message).join(", ")}`
+            : error.name === "MongoServerError" && error.code === 11000
+            ? "Order failed: duplicate key conflict in database"
+            : `Order failed: ${error.message}`;
+        res.status(500).json({ success: false, message: friendly });
     }
 });
 
 // ── All Orders Route ──────────────────────────────────────────────────────────
-app.get("/allorders", userVerification, async (req, res) => {
+app.get("/api/allorders", userVerification, async (req, res) => {
     try {
         const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000); // last 24 h
         const orders = await OrdersModel.find({
@@ -266,7 +317,7 @@ async function seedUserPortfolio(userId) {
 }
 
 // ── Funds Route ───────────────────────────────────────────────────────────────
-app.get("/funds", userVerification, async (req, res) => {
+app.get("/api/funds", userVerification, async (req, res) => {
     try {
         const user = await UserModel.findById(req.user._id).select("fundsAvailable username");
         if (!user) return res.status(404).json({ success: false, message: "User not found" });
@@ -287,13 +338,20 @@ app.post("/signup", async (req, res) => {
         if (await UserModel.findOne({ email }))
             return res.status(409).json({ success: false, message: "User already exists" });
 
-        const user = await UserModel.create({ email, username, password });
+        // Explicitly set fundsAvailable — even though the schema default covers new
+        // users, being explicit here prevents any migration gap for older schemas.
+        const user = await UserModel.create({ email, username, password, fundsAvailable: 100000 });
 
-        try { await seedUserPortfolio(user._id); }
-        catch (seedErr) { console.error("[SEED] Non-fatal error:", seedErr.message); }
+        // Fire-and-forget — do NOT await so the 201 response is sent instantly.
+        // Portfolio seeding runs in the background; failures are logged but never
+        // surface to the user (non-critical path).
+        seedUserPortfolio(user._id).catch((seedErr) =>
+            console.error("[SEED] Non-fatal error:", seedErr.message)
+        );
 
         const token = jwt.sign({ id: user._id }, process.env.TOKEN_KEY, { expiresIn: 3 * 24 * 60 * 60 });
         res.cookie("token", token, { httpOnly: true, secure: isProd, sameSite: isProd ? "none" : "lax" });
+        // Return user object so AuthContext.login() can hydrate username immediately
         res.status(201).json({ message: "User signed up successfully", success: true, user });
     } catch (error) {
         console.error("Signup error:", error);
@@ -312,7 +370,8 @@ app.post("/login", async (req, res) => {
         if (!auth) return res.json({ message: "Incorrect password or email" });
         const token = jwt.sign({ id: user._id }, process.env.TOKEN_KEY, { expiresIn: 3 * 24 * 60 * 60 });
         res.cookie("token", token, { httpOnly: true, secure: isProd, sameSite: isProd ? "none" : "lax" });
-        res.status(201).json({ message: "User logged in successfully", success: true });
+        // Return username so the dashboard can hydrate AuthContext instantly
+        res.status(201).json({ message: "User logged in successfully", success: true, username: user.username });
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: "Login failed. Please try again." });
@@ -404,19 +463,33 @@ mongoose
             console.log(`Server listening on port ${port}`);
         });
 
-        // ── Daily cleanup — runs every day at 00:05 IST ───────────────────────
-        // Deletes Orders older than 24 hours from the database.
-        // This keeps the Orders and Positions pages showing only recent activity.
+        // ── Daily midnight cleanup — runs every day at 00:00 IST ─────────────
+        // Empties the Orders and Positions collections to give a clean slate
+        // for the next trading day.  Each collection is cleared independently
+        // so a failure in one does not prevent the other from running.
         cron.schedule(
-            "5 0 * * *",        // 00:05 every day
+            "0 0 * * *",          // 00:00 IST exactly (midnight)
             async () => {
+                console.log("[CRON] Starting midnight cleanup…");
+
+                // 1. Delete all orders older than 24 h (rolling window)
                 try {
-                    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-                    const result = await OrdersModel.deleteMany({ createdAt: { $lt: cutoff } });
-                    console.log(`[CRON] Deleted ${result.deletedCount} order(s) older than 24 h`);
+                    const cutoff     = new Date(Date.now() - 24 * 60 * 60 * 1000);
+                    const ordersDel  = await OrdersModel.deleteMany({ createdAt: { $lt: cutoff } });
+                    console.log(`[CRON] Orders cleared: ${ordersDel.deletedCount} document(s) removed`);
                 } catch (err) {
-                    console.error("[CRON] Cleanup failed:", err.message);
+                    console.error("[CRON] Orders cleanup failed:", err.message);
                 }
+
+                // 2. Clear all positions (intraday slate — reset every night)
+                try {
+                    const posDel = await PositionsModel.deleteMany({});
+                    console.log(`[CRON] Positions cleared: ${posDel.deletedCount} document(s) removed`);
+                } catch (err) {
+                    console.error("[CRON] Positions cleanup failed:", err.message);
+                }
+
+                console.log("[CRON] Midnight cleanup complete.");
             },
             { timezone: "Asia/Kolkata" }
         );

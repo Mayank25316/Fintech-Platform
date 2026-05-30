@@ -848,8 +848,9 @@ hr {
    SHARED UTILITY — profit / loss text colours
    Used by Orders.jsx, Positions.jsx, Holdings.jsx
 ═══════════════════════════════════════════════════════════════════════════════ */
-.profit-text { color: #2e7d32; font-weight: 600; }
-.loss-text   { color: #c62828; font-weight: 600; }
+/* Spec-mandated P&L colours: #26a69a (teal-green) for profit, #ef5350 (red) for loss */
+.profit-text { color: #26a69a; font-weight: 600; }
+.loss-text   { color: #ef5350; font-weight: 600; }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    SHARED — Page header row
@@ -1028,52 +1029,8 @@ hr {
   padding: 4px 0;
 }
 
-.positions-summary {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  background: #fafafa;
-  border: 1px solid #eeeeee;
-  border-radius: 10px;
-  padding: 14px 22px;
-  margin-bottom: 20px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-}
-
-.pos-summary-item {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-
-.pos-summary-divider {
-  width: 1px;
-  height: 36px;
-  background: #e0e0e0;
-  margin: 0 24px;
-}
-
-.pos-summary-label {
-  font-size: 0.7rem;
-  color: #9e9e9e;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
-}
-
-.pos-summary-value {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #212121;
-}
-
-.pos-summary-value sup {
-  font-size: 0.68rem;
-  font-weight: 600;
-  margin-left: 5px;
-  vertical-align: super;
-}
+/* ─── positions-summary removed per spec ─── */
+/* The summary strip was replaced by a table footer total-P&L row */
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    POSITIONS — Table
@@ -1146,5 +1103,510 @@ hr {
   color: #7b1fa2;
   padding: 2px 6px;
   border-radius: 3px;
+  letter-spacing: 0.4px;
+}
+
+/* ── Total row in positions table footer ── */
+.positions-total-row {
+  background: #fafafa;
+  border-top: 1.5px solid #eeeeee;
+}
+.positions-total-row td {
+  padding: 11px 16px;
+  font-size: 0.85rem;
+}
+
+/* ── Error banner ── */
+.positions-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff8f8;
+  border: 1px solid #fde0e0;
+  color: #c62828;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 0.83rem;
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.positions-error-dismiss {
+  margin-left: auto;
+  background: none;
+  border: 1px solid #ef9a9a;
+  color: #c62828;
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: 0.77rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.positions-error-dismiss:hover { background: #fdecea; }
+
+/* ── Loading state ── */
+.positions-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #9e9e9e;
+  font-size: 0.85rem;
+  padding: 24px 0;
+}
+
+.pos-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(56, 126, 209, 0.2);
+  border-top-color: #387ed1;
+  border-radius: 50%;
+  animation: auth-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   PROFILE DROPDOWN — header nav
+═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Wrapper gives us a positioned parent for the absolute dropdown */
+.profile-wrapper {
+  position: relative;
+}
+
+/* The clickable row (avatar + username + chevron) — inherits existing .profile */
+.profile {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* ── Dropdown card ─────────────────────────────────────────────────────────── */
+.profile-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 200px;
+  background: #ffffff;
+  border: 1px solid #eeeeee;
+  border-radius: 10px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 2px 8px  rgba(0, 0, 0, 0.06);
+  z-index: 500;
+  overflow: hidden;
+  animation: dropdown-in 0.16s cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+
+@keyframes dropdown-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+/* Header section inside dropdown */
+.profile-dropdown-header {
+  padding: 14px 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-dropdown-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #212121;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-dropdown-sub {
+  font-size: 0.7rem;
+  color: #9e9e9e;
+  font-weight: 400;
+}
+
+/* Divider */
+.profile-dropdown-divider {
+  height: 1px;
+  background: #f0f0f0;
+  margin: 0;
+}
+
+/* Generic menu item */
+.profile-dropdown-item {
+  width: 100%;
+  padding: 11px 16px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 0.83rem;
+  font-weight: 500;
+  color: #424242;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: background 0.14s;
+}
+
+.profile-dropdown-item:hover {
+  background: #f5f5f5;
+}
+
+/* Logout gets a red accent */
+.logout-item {
+  color: #c62828;
+}
+
+.logout-item:hover {
+  background: #fdecea;
+  color: #b71c1c;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   AUTH PAGES — /login  /signup
+   Styled with the dashboard's own theme (no Bootstrap)
+═══════════════════════════════════════════════════════════════════════════════ */
+
+.auth-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8edf5 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.auth-card {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.08),
+    0 1px 4px  rgba(0, 0, 0, 0.04);
+  padding: 44px 40px 36px;
+  width: 100%;
+  max-width: 420px;
+  box-sizing: border-box;
+}
+
+/* Logo */
+.auth-logo {
+  text-align: center;
+  margin-bottom: 28px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.auth-logo-z    { color: #387ed1; }
+.auth-logo-stox { color: #212121; }
+
+/* Headings */
+.auth-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 4px;
+  text-align: center;
+}
+.auth-subtitle {
+  font-size: 0.83rem;
+  color: #9e9e9e;
+  text-align: center;
+  margin: 0 0 24px;
+}
+
+/* Error banner */
+.auth-error {
+  display: flex;
+  align-items: center;
+  background: #fff8f8;
+  border: 1px solid #f5c6cb;
+  color: #c62828;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.82rem;
+  margin-bottom: 18px;
+  line-height: 1.4;
+}
+
+/* Field group */
+.auth-field {
+  margin-bottom: 18px;
+}
+.auth-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 6px;
+  letter-spacing: 0.2px;
+}
+
+/* Input + eye wrapper */
+.auth-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.auth-input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid #dde1e8;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #212121;
+  background: #fafbfc;
+  box-sizing: border-box;
+  transition: border-color 0.18s, box-shadow 0.18s;
+  outline: none;
+}
+.auth-input:focus {
+  border-color: #387ed1;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(56, 126, 209, 0.12);
+}
+.auth-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Password eye button */
+.auth-eye-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9e9e9e;
+  padding: 0;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+.auth-eye-btn:hover { color: #387ed1; }
+
+/* Submit button */
+.auth-submit-btn {
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  background: #387ed1;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(56, 126, 209, 0.3);
+}
+.auth-submit-btn:hover:not(:disabled) {
+  background: #2d6bbf;
+  box-shadow: 0 4px 14px rgba(56, 126, 209, 0.4);
+  transform: translateY(-1px);
+}
+.auth-submit-btn:active:not(:disabled) { transform: translateY(0); }
+.auth-submit-btn:disabled,
+.auth-submit-btn.loading {
+  background: #87afd8;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Spinner (used by auth pages AND ProtectedRoute loading state) */
+.auth-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: auth-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes auth-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Switch link (Don't have an account? / Already have an account?) */
+.auth-switch {
+  text-align: center;
+  margin-top: 22px;
+  font-size: 0.82rem;
+  color: #9e9e9e;
+}
+.auth-link {
+  color: #387ed1;
+  font-weight: 600;
+  text-decoration: none;
+}
+.auth-link:hover { text-decoration: underline; }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   STOCK SEARCH — watchlist sidebar search bar + live dropdown
+═══════════════════════════════════════════════════════════════════════════════ */
+
+.ss-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* ── Input row ────────────────────────────────────────────────────────────── */
+.ss-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1.5px solid #dde1e8;
+  border-radius: 8px;
+  padding: 0 10px;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.ss-input-row:focus-within {
+  border-color: #387ed1;
+  box-shadow: 0 0 0 3px rgba(56, 126, 209, 0.10);
+}
+.ss-input-row.ss-loading {
+  border-color: #387ed1;
+}
+
+.ss-icon {
+  color: #aaa;
+  flex-shrink: 0;
+}
+
+.ss-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.82rem;
+  color: #212121;
+  padding: 8px 0;
+  min-width: 0;
+}
+.ss-input::placeholder { color: #bbb; }
+
+/* Spinner — shared with auth pages */
+.ss-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(56, 126, 209, 0.25);
+  border-top-color: #387ed1;
+  border-radius: 50%;
+  animation: auth-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+.ss-spinner-dark {
+  border-color: rgba(0,0,0,0.12);
+  border-top-color: #555;
+}
+
+.ss-clear-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #bbb;
+  font-size: 0.75rem;
+  padding: 2px 0;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.ss-clear-btn:hover { color: #555; }
+
+/* ── Dropdown panel ──────────────────────────────────────────────────────── */
+.ss-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #eaeaea;
+  border-radius: 10px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 2px 8px  rgba(0, 0, 0, 0.06);
+  z-index: 600;
+  overflow: hidden;
+  padding: 4px 0;
+  list-style: none;
+  margin: 0;
+  animation: dropdown-in 0.14s ease;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+/* ── Result row ──────────────────────────────────────────────────────────── */
+.ss-result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 14px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-bottom: 1px solid #f5f5f5;
+}
+.ss-result-row:last-child { border-bottom: none; }
+.ss-result-row:hover,
+.ss-result-row.ss-active {
+  background: #f0f6ff;
+}
+
+/* Left column: symbol + exchange badge */
+.ss-result-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.ss-result-symbol {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  white-space: nowrap;
+}
+.ss-exchange-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+/* Right column: full name + type */
+.ss-result-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  overflow: hidden;
+  min-width: 0;
+}
+.ss-result-name {
+  font-size: 0.75rem;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+.ss-result-type {
+  font-size: 0.62rem;
+  color: #aaa;
+  font-weight: 500;
+  text-transform: uppercase;
   letter-spacing: 0.4px;
 }

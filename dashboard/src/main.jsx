@@ -5,15 +5,18 @@ import { BrowserRouter } from "react-router-dom";
 import { LiveDataContextProvider } from './LiveDataContext.jsx';
 import { GeneralContextProvider } from "./GeneralContext";
 import { TradingContextProvider } from "./TradingContext";
+import { AuthContextProvider } from "./AuthContext";
 
 createRoot(document.getElementById('root')).render(
   <BrowserRouter>
     <LiveDataContextProvider>
-      <TradingContextProvider>
-        <GeneralContextProvider>
-          <App />
-        </GeneralContextProvider>
-      </TradingContextProvider>
+      <AuthContextProvider>
+        <TradingContextProvider>
+          <GeneralContextProvider>
+            <App />
+          </GeneralContextProvider>
+        </TradingContextProvider>
+      </AuthContextProvider>
     </LiveDataContextProvider>
   </BrowserRouter>,
 )

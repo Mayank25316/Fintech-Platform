@@ -1,49 +1,131 @@
-import { createContext, useState, useContext, useCallback, useEffect } from "react";
+import {
+    createContext,
+    useState,
+    useContext,
+    useCallback,
+    useEffect,
+    useMemo,
+} from "react";
 import axios from "axios";
+import { useLiveDataContext } from "./LiveDataContext";
 
 /**
- * TradingContext — global state owner for holdings.
+ * TradingContext — global state owner for holdings AND funds.
  *
  * Responsibilities:
- *  • Owns the `holdings` array (source of truth).
- *  • Exposes `fetchHoldings()` — authenticated GET /holdings.
- *  • Exposes `setHoldings()` — called immediately after a trade with the
- *    `updatedHoldings` array returned by POST /newOrder (zero extra round-trip).
+ *  • Owns `holdings[]`           — source of truth for the portfolio.
+ *  • Owns `fundsAvailable`       — real-time cash balance from the backend.
+ *  • Derives `totalInvestment`   — sum of (avg × qty) across all holdings.
+ *  • Derives `totalCurrentValue` — sum of (livePrice × qty), falls back to stored price.
+ *  • Derives `totalPnL`          — totalCurrentValue − totalInvestment.
+ *  • Exposes `fetchHoldings()`   — authenticated GET /holdings.
+ *  • Exposes `setHoldings()`     — called immediately after /newOrder (zero round-trip).
+ *  • Exposes `setFundsAvailable()`— called by GeneralContext after every trade so the
+ *                                   Funds/Summary UI reflects the new balance instantly.
  *
- * Any component that needs holdings should consume this context instead of
- * making its own fetch. This prevents duplicate requests and ensures
- * Holdings.jsx, Portfolio stats, and the chart all react to the same state.
+ * All consumers (Summary, Holdings, Funds) read from this single context —
+ * no duplicate fetches, no stale state.
  */
 
 const TradingContext = createContext({
-    holdings:      [],
-    fetchHoldings: () => {},
-    setHoldings:   () => {},
+    holdings:          [],
+    fundsAvailable:    100000,
+    totalInvestment:   0,
+    totalCurrentValue: 0,
+    totalPnL:          0,
+    pnlPercentage:     0,
+    fetchHoldings:     () => {},
+    setHoldings:       () => {},
+    setFundsAvailable: () => {},
 });
 
 export const TradingContextProvider = ({ children }) => {
-    const [holdings, setHoldings] = useState([]);
+    const { livePrices } = useLiveDataContext();
 
+    const [holdings,       setHoldings]       = useState([]);
+    // Default to 100000 — overwritten immediately once GET /funds resolves.
+    // Using null as the "not-yet-fetched" sentinel so we can distinguish
+    // "loading" from "the user genuinely has ₹0".
+    const [fundsAvailable, setFundsAvailable] = useState(null);
+
+    // ── Fetch holdings (authenticated) ────────────────────────────────────────
     const fetchHoldings = useCallback(async () => {
         try {
             const res = await axios.get(
-                `${import.meta.env.VITE_API_URL}/holdings`,
+                `${import.meta.env.VITE_API_URL}/api/holdings`,
                 { withCredentials: true }
             );
             setHoldings(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
-            console.error("[TradingContext] fetchHoldings error:", err);
+            console.error("[TradingContext] fetchHoldings error:", err.message);
             setHoldings([]);
         }
     }, []);
 
-    // Initial load on mount
+    // ── Fetch real-time funds balance (authenticated) ─────────────────────────
+    const fetchFunds = useCallback(async () => {
+        try {
+            const res = await axios.get(
+                `${import.meta.env.VITE_API_URL}/api/funds`,
+                { withCredentials: true }
+            );
+            // Backend returns { success, fundsAvailable, username }
+            const val = res.data?.fundsAvailable;
+            // Guard: if backend returns undefined/null, fall back to 100000
+            setFundsAvailable(typeof val === "number" ? val : 100000);
+        } catch (err) {
+            console.error("[TradingContext] fetchFunds error:", err.message);
+            // Don't crash — use the default
+            setFundsAvailable((prev) => (prev === null ? 100000 : prev));
+        }
+    }, []);
+
+    // Initial load — run both fetches in parallel on mount
     useEffect(() => {
         fetchHoldings();
-    }, [fetchHoldings]);
+        fetchFunds();
+    }, [fetchHoldings, fetchFunds]);
+
+    // ── Derived portfolio metrics (recomputed whenever holdings OR livePrices change)
+    // Using useMemo so consumers don't get new object references on unrelated re-renders.
+    const { totalInvestment, totalCurrentValue } = useMemo(
+        () =>
+            holdings.reduce(
+                (acc, stock) => {
+                    // Prefer live price; fall back to the stored avg price
+                    const livePrice = livePrices[stock.name]?.price ?? stock.price;
+                    acc.totalInvestment   += (stock.avg   ?? stock.price) * stock.qty;
+                    acc.totalCurrentValue += livePrice * stock.qty;
+                    return acc;
+                },
+                { totalInvestment: 0, totalCurrentValue: 0 }
+            ),
+        [holdings, livePrices]
+    );
+
+    const totalPnL      = totalCurrentValue - totalInvestment;
+    const pnlPercentage = totalInvestment > 0 ? (totalPnL / totalInvestment) * 100 : 0;
+
+    // Resolved funds: while the fetch is still in-flight (null), default to 100000
+    // so the UI never shows NaN or crashes
+    const resolvedFunds = fundsAvailable ?? 100000;
 
     return (
-        <TradingContext.Provider value={{ holdings, setHoldings, fetchHoldings }}>
+        <TradingContext.Provider
+            value={{
+                holdings,
+                setHoldings,
+                fetchHoldings,
+
+                fundsAvailable:    resolvedFunds,
+                setFundsAvailable,
+
+                totalInvestment,
+                totalCurrentValue,
+                totalPnL,
+                pnlPercentage,
+            }}
+        >
             {children}
         </TradingContext.Provider>
     );

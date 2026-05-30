@@ -23,7 +23,7 @@ export default function BuyActionWindow({ uid }) {
     const handleBuyClick = async () => {
         try {
             const response = await axios.post(
-                `${import.meta.env.VITE_API_URL}/newOrder`,
+                `${import.meta.env.VITE_API_URL}/api/newOrder`,
                 {
                     name: uid,
                     qty: Number(stockQty), 
@@ -37,7 +37,6 @@ export default function BuyActionWindow({ uid }) {
             closeBuyWindow();
         } catch (error) {
             console.error("Error placing order:", error);
-            alert("Failed to place order. Check console.");
         }
     };
 

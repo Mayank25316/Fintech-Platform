@@ -2,6 +2,7 @@ import { watchlist } from "./data/data";
 import WatchlistItem from "./WatchlistItem";
 import { DoughnutChart } from "./DoughnutChart";
 import { useLiveDataContext } from "./LiveDataContext";
+import StockSearch from "./StockSearch";
 
 export default function WatchList(){
   const { livePrices } = useLiveDataContext();
@@ -41,13 +42,7 @@ export default function WatchList(){
   return (
     <div className="watchlist-container">
       <div className="search-container">
-        <input
-          type="text"
-          name="search"
-          id="search"
-          placeholder="Search eg:infy, bse, nifty fut weekly, gold mcx"
-          className="search"
-        />
+        <StockSearch />
         <span className="counts">{Array.isArray(watchlist) ? watchlist.length : 0}/50</span>
       </div>
       <ul className="list">

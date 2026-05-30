@@ -9,7 +9,7 @@ const GeneralContext = createContext({
 });
 
 export const GeneralContextProvider = ({ children }) => {
-    const { setHoldings } = useTradingContext();
+    const { setHoldings, setFundsAvailable } = useTradingContext();
 
     const [isTradeWindowOpen, setIsTradeWindowOpen] = useState(false);
     const [selectedStock,     setSelectedStock]      = useState(null);   // { name, price, qty? }
@@ -41,14 +41,18 @@ export const GeneralContextProvider = ({ children }) => {
      *                Holdings.jsx as a safety net (e.g., if updatedHoldings
      *                is somehow missing from the response).
      */
-    const handleOrderSuccess = useCallback((updatedHoldings, _fundsAvailable) => {
+    const handleOrderSuccess = useCallback((updatedHoldings, newFundsAvailable) => {
         if (Array.isArray(updatedHoldings) && updatedHoldings.length >= 0) {
-            // Immediate state sync — no extra GET request needed
+            // Immediate holdings state sync — no extra GET request needed
             setHoldings(updatedHoldings);
+        }
+        // Sync funds balance immediately so Summary/Funds pages update in real-time
+        if (typeof newFundsAvailable === "number") {
+            setFundsAvailable(newFundsAvailable);
         }
         // Always bump the key so Holdings.jsx re-fetches as a safety-net
         setHoldingsRefreshKey((prev) => prev + 1);
-    }, [setHoldings]);
+    }, [setHoldings, setFundsAvailable]);
 
     return (
         <GeneralContext

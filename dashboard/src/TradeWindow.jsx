@@ -86,7 +86,7 @@ export default function TradeWindow({ stock, mode: initialMode = "BUY", onClose,
 
         try {
             const response = await axios.post(
-                `${import.meta.env.VITE_API_URL}/newOrder`,
+                `${import.meta.env.VITE_API_URL}/api/newOrder`,
                 { name: stock.name, qty, price, mode: activeMode },
                 { withCredentials: true }
             );
