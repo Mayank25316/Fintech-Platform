@@ -1,34 +1,51 @@
-import BuyActionWindow from "./BuyActionWindow";
+import TradeWindow from "./TradeWindow";
 import { createContext, useState, useContext } from "react";
 
 const GeneralContext = createContext({
-    openBuyWindow: (uid) => { },
-    closeBuyWindow: () => { },
+    openTradeWindow: (stock, mode) => {},
+    closeTradeWindow: () => {},
 });
 
 export const GeneralContextProvider = ({ children }) => {
-    const [isBuyWindowOpen, setIsBuyWindowOpen] = useState(false);
-    const [selectedStockUID, setSelectedStockUID] = useState("");
+    const [isTradeWindowOpen,  setIsTradeWindowOpen]  = useState(false);
+    const [selectedStock,      setSelectedStock]       = useState(null);   // { name, price }
+    const [tradeMode,          setTradeMode]           = useState("BUY");  // "BUY" | "SELL"
+    // Increment this to trigger a Holdings re-fetch after a successful order
+    const [holdingsRefreshKey, setHoldingsRefreshKey] = useState(0);
 
-    const handleOpenBuyWindow = (uid) => {
-        setIsBuyWindowOpen(true);
-        setSelectedStockUID(uid);
+    const handleOpenTradeWindow = (stock, mode = "BUY") => {
+        setSelectedStock(stock);
+        setTradeMode(mode);
+        setIsTradeWindowOpen(true);
     };
 
-    const handleCloseBuyWindow = () => {
-        setIsBuyWindowOpen(false);
-        setSelectedStockUID("");
+    const handleCloseTradeWindow = () => {
+        setIsTradeWindowOpen(false);
+        setSelectedStock(null);
+    };
+
+    // Called by TradeWindow on a successful order → bumps the refresh key
+    const handleOrderSuccess = () => {
+        setHoldingsRefreshKey((prev) => prev + 1);
     };
 
     return (
         <GeneralContext
             value={{
-                openBuyWindow: handleOpenBuyWindow,
-                closeBuyWindow: handleCloseBuyWindow,
+                openTradeWindow:   handleOpenTradeWindow,
+                closeTradeWindow:  handleCloseTradeWindow,
+                holdingsRefreshKey,
             }}
         >
             {children}
-            {isBuyWindowOpen && <BuyActionWindow uid={selectedStockUID} />}
+            {isTradeWindowOpen && selectedStock && (
+                <TradeWindow
+                    stock={selectedStock}
+                    mode={tradeMode}
+                    onClose={handleCloseTradeWindow}
+                    onSuccess={handleOrderSuccess}
+                />
+            )}
         </GeneralContext>
     );
 };

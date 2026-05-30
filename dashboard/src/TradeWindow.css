@@ -1,0 +1,249 @@
+/* ── TradeWindow — reusable Buy/Sell pop-up ─────────────────────────────────── */
+
+/* Backdrop overlay */
+.trade-window-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 12, 18, 0.55);
+    backdrop-filter: blur(3px);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: tw-fade-in 0.18s ease;
+}
+
+@keyframes tw-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Window card */
+.trade-window {
+    width: 400px;
+    background: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.22), 0 4px 16px rgba(0, 0, 0, 0.10);
+    overflow: hidden;
+    animation: tw-slide-up 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes tw-slide-up {
+    from { opacity: 0; transform: translateY(28px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────────── */
+.tw-header {
+    padding: 16px 20px 0;
+    background: #fff;
+}
+
+.tw-stock-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 0 0 2px;
+    letter-spacing: 0.5px;
+}
+
+.tw-exchange-badge {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 12px;
+    display: block;
+}
+
+/* ── Buy / Sell toggle tabs ─────────────────────────────────────────────────── */
+.tw-tabs {
+    display: flex;
+    border-bottom: 2px solid #e9ecef;
+    margin: 0 -20px;
+    padding: 0 20px;
+}
+
+.tw-tab {
+    flex: 1;
+    padding: 10px 0;
+    border: none;
+    background: transparent;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    cursor: pointer;
+    color: #adb5bd;
+    position: relative;
+    transition: color 0.18s;
+}
+
+.tw-tab::after {
+    content: "";
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: transparent;
+    transition: background 0.18s;
+}
+
+/* Active BUY tab */
+.tw-tab.buy.active {
+    color: #2962ff;
+}
+.tw-tab.buy.active::after {
+    background: #2962ff;
+}
+
+/* Active SELL tab */
+.tw-tab.sell.active {
+    color: #d32f2f;
+}
+.tw-tab.sell.active::after {
+    background: #d32f2f;
+}
+
+/* ── Body / inputs ───────────────────────────────────────────────────────────── */
+.tw-body {
+    padding: 20px;
+}
+
+.tw-inputs {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.tw-field {
+    flex: 1;
+    border: 1.5px solid #dee2e6;
+    border-radius: 6px;
+    padding: 6px 12px 8px;
+    transition: border-color 0.18s;
+}
+
+.tw-field:focus-within {
+    border-color: #2962ff;
+}
+
+.tw-field.sell-mode:focus-within {
+    border-color: #d32f2f;
+}
+
+.tw-field legend {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0 2px;
+}
+
+.tw-field input {
+    width: 100%;
+    border: none;
+    outline: none;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #1a1a2e;
+    background: transparent;
+    padding: 4px 0 0;
+}
+
+/* ── Margin info strip ──────────────────────────────────────────────────────── */
+.tw-margin-strip {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 18px;
+}
+
+.tw-margin-label {
+    font-size: 0.75rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.tw-margin-value {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #1a1a2e;
+}
+
+/* ── Action buttons ──────────────────────────────────────────────────────────── */
+.tw-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.tw-btn {
+    flex: 1;
+    padding: 11px 0;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.12s;
+}
+
+.tw-btn:active {
+    transform: scale(0.97);
+}
+
+.tw-btn-primary.buy-btn {
+    background: #2962ff;
+    color: #fff;
+}
+.tw-btn-primary.buy-btn:hover {
+    background: #1565c0;
+}
+
+.tw-btn-primary.sell-btn {
+    background: #d32f2f;
+    color: #fff;
+}
+.tw-btn-primary.sell-btn:hover {
+    background: #b71c1c;
+}
+
+.tw-btn-primary:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.tw-btn-cancel {
+    background: #e9ecef;
+    color: #495057;
+    font-weight: 600;
+}
+.tw-btn-cancel:hover {
+    background: #dee2e6;
+}
+
+/* ── Error / feedback message ────────────────────────────────────────────────── */
+.tw-message {
+    font-size: 0.78rem;
+    font-weight: 500;
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 5px;
+    text-align: center;
+}
+
+.tw-message.error {
+    background: #fdecea;
+    color: #c62828;
+}
+
+.tw-message.success {
+    background: #e8f5e9;
+    color: #2e7d32;
+}

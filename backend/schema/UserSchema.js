@@ -19,11 +19,22 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: new Date(),
     },
+    // Baseline funding — every new user starts with ₹1,00,000
+    fundsAvailable: {
+        type: Number,
+        default: 100000,
+    },
+    // NOTE: userHoldings removed — holdings are fully decoupled into the
+    // separate 'holding' collection (HoldingsSchema) with userId reference.
+    // Fetch via: Holding.find({ userId: <user._id> })
 });
 
-// Password save hone se pehle encrypt karna
-userSchema.pre("save", async function () {
-    this.password = await bcrypt.hash(this.password, 12);
+// Encrypt password only when it has been newly set or changed
+// Guard prevents double-hashing on subsequent saves
+userSchema.pre("save", async function (next) {
+    if (!this.isModified("password")) return next();
+    this.password = await bcrypt.hash(this.password, 10);
+    next();
 });
 
 module.exports = userSchema;
