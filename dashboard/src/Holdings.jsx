@@ -29,15 +29,25 @@ export default function Holdings() {
                     `${import.meta.env.VITE_API_URL}/api/holdings`,
                     { withCredentials: true }
                 );
+                // Only update state on a clean 200 — never wipe on error
                 if (!cancelled) setHoldings(Array.isArray(res.data) ? res.data : []);
             } catch (err) {
-                console.error("[Holdings] re-fetch error:", err);
+                const status = err?.response?.status;
+                if (status === 404) {
+                    console.warn("[Holdings] GET /api/holdings → 404. Backend deploying. Keeping existing state.");
+                } else if (status === 401) {
+                    console.warn("[Holdings] GET /api/holdings → 401. Session may have expired.");
+                } else {
+                    console.error("[Holdings] re-fetch error:", err.message);
+                    // Preserve existing data — don't wipe to []
+                }
             }
         };
         // Only refetch when key > 0 (skip the initial mount — TradingContext already fetches)
         if (holdingsRefreshKey > 0) refetch();
         return () => { cancelled = true; };
     }, [holdingsRefreshKey, setHoldings]);
+
 
     // ── Portfolio calculations via .reduce() on live holdings ─────────────────
     const { totalInvestment, totalCurrentValue } = useMemo(() =>

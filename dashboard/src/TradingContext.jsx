@@ -55,10 +55,21 @@ export const TradingContextProvider = ({ children }) => {
                 `${import.meta.env.VITE_API_URL}/api/holdings`,
                 { withCredentials: true }
             );
+            // Only update state on a clean 200 response
             setHoldings(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
-            console.error("[TradingContext] fetchHoldings error:", err.message);
-            setHoldings([]);
+            // 404 = route not found (deploy lag) / 401 = token expired
+            // In both cases, PRESERVE existing holdings — don't wipe to []
+            const status = err?.response?.status;
+            if (status === 404) {
+                console.warn("[TradingContext] GET /api/holdings → 404. Backend may still be deploying. Keeping existing state.");
+            } else if (status === 401) {
+                console.warn("[TradingContext] GET /api/holdings → 401. Session expired. Keeping existing state.");
+            } else {
+                console.error("[TradingContext] fetchHoldings error:", err.message);
+                // Only set to [] on a genuine network / server error (5xx) on first load
+                setHoldings((prev) => prev.length === 0 ? [] : prev);
+            }
         }
     }, []);
 
@@ -69,14 +80,19 @@ export const TradingContextProvider = ({ children }) => {
                 `${import.meta.env.VITE_API_URL}/api/funds`,
                 { withCredentials: true }
             );
-            // Backend returns { success, fundsAvailable, username }
             const val = res.data?.fundsAvailable;
-            // Guard: if backend returns undefined/null, fall back to 100000
             setFundsAvailable(typeof val === "number" ? val : 100000);
         } catch (err) {
-            console.error("[TradingContext] fetchFunds error:", err.message);
-            // Don't crash — use the default
-            setFundsAvailable((prev) => (prev === null ? 100000 : prev));
+            const status = err?.response?.status;
+            if (status === 404) {
+                console.warn("[TradingContext] GET /api/funds → 404. Backend may still be deploying. Keeping existing state.");
+            } else if (status === 401) {
+                console.warn("[TradingContext] GET /api/funds → 401. Session expired.");
+            } else {
+                console.error("[TradingContext] fetchFunds error:", err.message);
+                // Only initialize to 100000 if we've never received a real value
+                setFundsAvailable((prev) => (prev === null ? 100000 : prev));
+            }
         }
     }, []);
 
