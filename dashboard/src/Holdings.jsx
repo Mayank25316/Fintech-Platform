@@ -1,84 +1,88 @@
+import { useEffect, useMemo } from "react";
 import axios from "axios";
-import { useState, useEffect } from "react";
 import { VerticalGraph } from "./VerticalGraph";
 import { useLiveDataContext } from "./LiveDataContext";
 import { useGeneralContext } from "./GeneralContext";
+import { useTradingContext } from "./TradingContext";
 
 /**
- * Holdings — shows the authenticated user's equity portfolio.
+ * Holdings — renders the authenticated user's equity portfolio.
  *
- * Key behaviours:
- *  • Fetches holdings from GET /holdings with { withCredentials: true }
- *  • Re-fetches whenever holdingsRefreshKey increments (post-order auto-refresh)
- *  • Clicking a stock name opens TradeWindow (BUY/SELL toggle visible by default)
+ * State source:  TradingContext.holdings  (set on mount + after every trade)
+ * Re-fetch path: holdingsRefreshKey bump from GeneralContext → fetchHoldings()
+ *
+ * Two-path sync ensures the UI is always fresh:
+ *  1. Primary: setHoldings(updatedHoldings) immediately after /newOrder response
+ *  2. Fallback: GET /holdings re-fetched when holdingsRefreshKey increments
  */
 export default function Holdings() {
-    const [holdings, setHoldings] = useState([]);
-    const { livePrices }          = useLiveDataContext();
+    const { holdings, setHoldings } = useTradingContext();
+    const { livePrices }            = useLiveDataContext();
     const { openTradeWindow, holdingsRefreshKey } = useGeneralContext();
 
-    // ── Fetch holdings ─────────────────────────────────────────────────────────
+    // ── Safety-net re-fetch triggered by holdingsRefreshKey ───────────────────
     useEffect(() => {
-        const fetchHoldings = async () => {
+        let cancelled = false;
+        const refetch = async () => {
             try {
                 const res = await axios.get(
                     `${import.meta.env.VITE_API_URL}/holdings`,
                     { withCredentials: true }
                 );
-                setHoldings(Array.isArray(res.data) ? res.data : []);
-            } catch (error) {
-                console.error("Error fetching holdings:", error);
-                setHoldings([]); // graceful fallback — never crash the UI
+                if (!cancelled) setHoldings(Array.isArray(res.data) ? res.data : []);
+            } catch (err) {
+                console.error("[Holdings] re-fetch error:", err);
             }
         };
+        // Only refetch when key > 0 (skip the initial mount — TradingContext already fetches)
+        if (holdingsRefreshKey > 0) refetch();
+        return () => { cancelled = true; };
+    }, [holdingsRefreshKey, setHoldings]);
 
-        fetchHoldings();
-    }, [holdingsRefreshKey]); // re-runs whenever an order is placed successfully
-
-    // ── Portfolio calculations ─────────────────────────────────────────────────
-    let totalInvestment   = 0;
-    let totalCurrentValue = 0;
-
-    holdings.forEach((stock) => {
-        const currentPrice = livePrices[stock.name]
-            ? livePrices[stock.name].price
-            : stock.price;
-        totalInvestment   += stock.avg * stock.qty;
-        totalCurrentValue += currentPrice * stock.qty;
-    });
+    // ── Portfolio calculations via .reduce() on live holdings ─────────────────
+    const { totalInvestment, totalCurrentValue } = useMemo(() =>
+        holdings.reduce(
+            (acc, stock) => {
+                const livePrice = livePrices[stock.name]?.price ?? stock.price;
+                acc.totalInvestment   += stock.avg * stock.qty;
+                acc.totalCurrentValue += livePrice * stock.qty;
+                return acc;
+            },
+            { totalInvestment: 0, totalCurrentValue: 0 }
+        ),
+        [holdings, livePrices]
+    );
 
     const totalPnL      = totalCurrentValue - totalInvestment;
     const pnlPercentage = totalInvestment > 0 ? (totalPnL / totalInvestment) * 100 : 0;
     const isTotalProfit = totalPnL >= 0;
 
-    // ── Chart data ─────────────────────────────────────────────────────────────
-    const labels = holdings.map((stock) => stock.name);
-    const data   = {
-        labels,
+    // ── Chart data — re-derived whenever holdings or livePrices change ─────────
+    const chartData = useMemo(() => ({
+        labels: holdings.map((s) => s.name),
         datasets: [
             {
-                label:           "Stock Price",
-                data:            holdings.map((stock) =>
-                    livePrices[stock.name] ? livePrices[stock.name].price : stock.price
-                ),
+                label:           "Price (₹)",
+                data:            holdings.map((s) => livePrices[s.name]?.price ?? s.price),
                 backgroundColor: "rgba(222, 20, 87, 0.66)",
                 yAxisID:         "y",
             },
             {
-                label:           "Stock Qty",
-                data:            holdings.map((stock) => stock.qty),
+                label:           "Qty",
+                data:            holdings.map((s) => s.qty),
                 backgroundColor: "rgba(26, 132, 232, 0.87)",
                 yAxisID:         "y1",
             },
         ],
-    };
+    }), [holdings, livePrices]);
 
-    // ── Handle stock name click → open TradeWindow ─────────────────────────────
+    // chartKey forces a full Bar remount when the holdings list changes
+    // (e.g., a stock is fully sold and its label disappears from the chart)
+    const chartKey = holdings.map((s) => `${s.name}:${s.qty}`).join(",");
+
+    // ── Open TradeWindow with current qty pre-filled ───────────────────────────
     const handleStockClick = (stock) => {
-        const currentPrice = livePrices[stock.name]
-            ? livePrices[stock.name].price
-            : stock.price;
-        // Pass qty so TradeWindow can show held quantity in SELL mode
+        const currentPrice = livePrices[stock.name]?.price ?? stock.price;
         openTradeWindow({ name: stock.name, price: currentPrice, qty: stock.qty }, "BUY");
     };
 
@@ -103,32 +107,25 @@ export default function Holdings() {
                     <tbody>
                         {holdings.map((stock, index) => {
                             const currentData  = livePrices[stock.name];
-                            const currentPrice = currentData ? currentData.price : stock.price;
+                            const currentPrice = currentData?.price ?? stock.price;
                             const dayChange    = currentData
                                 ? currentData.changePercent.toFixed(2)
                                 : stock.day;
 
-                            const currValue  = currentPrice * stock.qty;
-                            const pnl        = currValue - stock.avg * stock.qty;
-                            const isProfit   = pnl >= 0;
+                            const currValue   = currentPrice * stock.qty;
+                            const pnl         = currValue - stock.avg * stock.qty;
+                            const isProfit    = pnl >= 0;
                             const profitClass = isProfit ? "profit" : "loss";
-
-                            const isDayProfit = currentData
-                                ? currentData.changePercent >= 0
-                                : !stock.isLoss;
-                            const dayClass = isDayProfit ? "profit" : "loss";
+                            const isDayProfit = currentData ? currentData.changePercent >= 0 : !stock.isLoss;
+                            const dayClass    = isDayProfit ? "profit" : "loss";
 
                             return (
-                                <tr key={index}>
-                                    {/* Clickable stock name → opens TradeWindow with toggle */}
+                                <tr key={stock._id ?? index}>
+                                    {/* Clickable black stock name opens TradeWindow */}
                                     <td>
                                         <span
                                             id={`holding-${stock.name}`}
-                                            style={{
-                                                cursor:     "pointer",
-                                                color:      "#333333",
-                                                fontWeight: 600,
-                                            }}
+                                            style={{ cursor: "pointer", color: "#000000", fontWeight: 600 }}
                                             title={`Click to trade ${stock.name}`}
                                             onClick={() => handleStockClick(stock)}
                                         >
@@ -149,22 +146,17 @@ export default function Holdings() {
                 </table>
             </div>
 
+            {/* Portfolio summary stats — computed via .reduce() on live holdings */}
             <div className="row">
                 <div className="col">
                     <h5>
-                        {totalInvestment.toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                        })}
+                        {totalInvestment.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </h5>
                     <p>Total investment</p>
                 </div>
                 <div className="col">
                     <h5>
-                        {totalCurrentValue.toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                        })}
+                        {totalCurrentValue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </h5>
                     <p>Current value</p>
                 </div>
@@ -173,18 +165,15 @@ export default function Holdings() {
                         className={isTotalProfit ? "profit" : "loss"}
                         style={{ color: isTotalProfit ? "#4caf50" : "#f44336" }}
                     >
-                        {totalPnL.toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                        })}{" "}
-                        ({isTotalProfit ? "+" : ""}
-                        {pnlPercentage.toFixed(2)}%)
+                        {totalPnL.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
+                        ({isTotalProfit ? "+" : ""}{pnlPercentage.toFixed(2)}%)
                     </h5>
                     <p>P&amp;L</p>
                 </div>
             </div>
 
-            <VerticalGraph data={data} />
+            {/* chartKey forces Bar to re-render when holdings composition changes */}
+            <VerticalGraph key={chartKey} data={chartData} />
         </>
     );
 }

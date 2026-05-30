@@ -93,10 +93,11 @@ export default function TradeWindow({ stock, mode: initialMode = "BUY", onClose,
 
             if (response.data.success) {
                 setMessage({ type: "success", text: `${activeMode} order placed successfully!` });
-                // Close immediately and pass back the updated holding for instant state patch
                 setTimeout(() => {
                     onClose?.();
-                    onSuccess?.(response.data.updatedHolding, response.data.fundsAvailable);
+                    // Pass the FULL updated holdings array returned by the backend.
+                    // GeneralContext.handleOrderSuccess calls setHoldings() immediately.
+                    onSuccess?.(response.data.updatedHoldings ?? [], response.data.fundsAvailable);
                 }, 700);
             } else {
                 setMessage({ type: "error", text: response.data.message || "Order failed." });

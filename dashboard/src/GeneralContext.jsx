@@ -1,29 +1,26 @@
 import TradeWindow from "./TradeWindow";
 import { createContext, useState, useContext, useCallback } from "react";
+import { useTradingContext } from "./TradingContext";
 
 const GeneralContext = createContext({
-    openTradeWindow:   (stock, mode) => {},
-    closeTradeWindow:  () => {},
+    openTradeWindow:    (stock, mode) => {},
+    closeTradeWindow:   () => {},
     holdingsRefreshKey: 0,
 });
 
 export const GeneralContextProvider = ({ children }) => {
-    const [isTradeWindowOpen,  setIsTradeWindowOpen]  = useState(false);
-    // selectedStock = { name, price, qty? }  — qty is the user's currently held qty
-    const [selectedStock,      setSelectedStock]       = useState(null);
-    const [tradeMode,          setTradeMode]           = useState("BUY");
+    const { setHoldings } = useTradingContext();
 
-    // Incrementing this key triggers a re-fetch in Holdings.jsx
-    const [holdingsRefreshKey, setHoldingsRefreshKey] = useState(0);
+    const [isTradeWindowOpen, setIsTradeWindowOpen] = useState(false);
+    const [selectedStock,     setSelectedStock]      = useState(null);   // { name, price, qty? }
+    const [tradeMode,         setTradeMode]          = useState("BUY");
 
     /**
-     * openTradeWindow
-     * @param {{ name: string, price: number, qty?: number }} stock
-     * @param {"BUY"|"SELL"} mode
-     *
-     * Passing `qty` from the holdings table lets TradeWindow show
-     * the held quantity in SELL mode and enforce the validation.
+     * holdingsRefreshKey is kept for backward-compat so Holdings.jsx still
+     * compiles, but the primary sync path is now via TradingContext.setHoldings().
      */
+    const [holdingsRefreshKey, setHoldingsRefreshKey] = useState(0);
+
     const handleOpenTradeWindow = useCallback((stock, mode = "BUY") => {
         setSelectedStock(stock);
         setTradeMode(mode);
@@ -38,13 +35,20 @@ export const GeneralContextProvider = ({ children }) => {
     /**
      * handleOrderSuccess
      * Called by TradeWindow after a successful order.
-     * Always bumps holdingsRefreshKey to trigger a Holdings re-fetch;
-     * the updatedHolding / fundsAvailable are available here for future
-     * global-state optimistic patches if a TradingContext is added.
+     *
+     * Primary path:  setHoldings(updatedHoldings)  — immediate, zero-latency.
+     * Fallback path: bump holdingsRefreshKey        — triggers re-fetch in
+     *                Holdings.jsx as a safety net (e.g., if updatedHoldings
+     *                is somehow missing from the response).
      */
-    const handleOrderSuccess = useCallback((_updatedHolding, _fundsAvailable) => {
+    const handleOrderSuccess = useCallback((updatedHoldings, _fundsAvailable) => {
+        if (Array.isArray(updatedHoldings) && updatedHoldings.length >= 0) {
+            // Immediate state sync — no extra GET request needed
+            setHoldings(updatedHoldings);
+        }
+        // Always bump the key so Holdings.jsx re-fetches as a safety-net
         setHoldingsRefreshKey((prev) => prev + 1);
-    }, []);
+    }, [setHoldings]);
 
     return (
         <GeneralContext
@@ -57,10 +61,10 @@ export const GeneralContextProvider = ({ children }) => {
             {children}
             {isTradeWindowOpen && selectedStock && (
                 <TradeWindow
-                    stock={selectedStock}           // includes qty for SELL validation
+                    stock={selectedStock}
                     mode={tradeMode}
                     onClose={handleCloseTradeWindow}
-                    onSuccess={handleOrderSuccess}  // receives (updatedHolding, fundsAvailable)
+                    onSuccess={handleOrderSuccess}
                 />
             )}
         </GeneralContext>

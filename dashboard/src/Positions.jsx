@@ -20,10 +20,6 @@ export default function Positions() {
             .catch((err) => console.error("Positions fetch error:", err));
     }, []);
 
-    // Aggregate totals across all positions
-    let totalPnL       = 0;
-    let totalInvested  = 0;
-
     const enriched = positions.map((stock) => {
         const currentData  = livePrices[stock.name];
         const currentPrice = currentData ? currentData.price : stock.price;
@@ -31,13 +27,9 @@ export default function Positions() {
         const currentVal   = currentPrice * stock.qty;
         const pnl          = currentVal - invested;
         const dayChange    = currentData ? currentData.changePercent : 0;
-        totalPnL      += pnl;
-        totalInvested += invested;
         return { ...stock, currentPrice, pnl, dayChange, invested, currentVal };
     });
 
-    const totalPnLPct = totalInvested > 0 ? (totalPnL / totalInvested) * 100 : 0;
-    const isPnLPos    = totalPnL >= 0;
 
     return (
         <div className="positions-page">
@@ -47,25 +39,8 @@ export default function Positions() {
                 <span className="orders-count-badge">{positions.length} open</span>
             </div>
 
-            {/* Summary strip */}
-            {positions.length > 0 && (
-                <div className="positions-summary">
-                    <div className="pos-summary-item">
-                        <span className="pos-summary-label">Total P&amp;L</span>
-                        <span className={`pos-summary-value ${isPnLPos ? "profit-text" : "loss-text"}`}>
-                            {isPnLPos ? "+" : ""}₹{totalPnL.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            <sup>{isPnLPos ? "+" : ""}{totalPnLPct.toFixed(2)}%</sup>
-                        </span>
-                    </div>
-                    <div className="pos-summary-divider" />
-                    <div className="pos-summary-item">
-                        <span className="pos-summary-label">Total Invested</span>
-                        <span className="pos-summary-value">
-                            ₹{totalInvested.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                    </div>
-                </div>
-            )}
+
+
 
             {enriched.length === 0 ? (
                 <div className="empty-state">
