@@ -10,7 +10,9 @@ const cron         = require("node-cron");
 const app          = express();
 const port         = process.env.PORT || 3000;
 const url          = process.env.MONGO_URL;
-const yahooFinance = require("yahoo-finance2").default || require("yahoo-finance2");
+// yahoo-finance2 v3 requires explicit instantiation — require().default was v2 syntax
+const { YahooFinance } = require("yahoo-finance2");
+const yahooFinance     = new YahooFinance();
 const cookieParser = require("cookie-parser");
 const jwt          = require("jsonwebtoken");
 const bcrypt       = require("bcryptjs");
@@ -180,19 +182,12 @@ app.post("/api/newOrder", userVerification, async (req, res) => {
                 });
             }
 
-            // Atomic deduction.
-            // Pipeline form: coerce null/undefined fundsAvailable to 100000 for legacy users,
-            // then subtract totalCost — all in one DB round-trip.
+            // Compute new balance in JS using the already-validated currentFunds.
+            // Using plain $set avoids Mongoose 9 pipeline-array restrictions.
+            const newFunds    = parseFloat((currentFunds - totalCost).toFixed(2));
             const updatedUser = await UserModel.findByIdAndUpdate(
                 userId,
-                [{ $set: {
-                    fundsAvailable: {
-                        $subtract: [
-                            { $ifNull: ["$fundsAvailable", 100000] },
-                            totalCost
-                        ]
-                    }
-                }}],
+                { $set: { fundsAvailable: newFunds } },
                 { new: true }
             );
             if (!updatedUser) {
@@ -240,18 +235,12 @@ app.post("/api/newOrder", userVerification, async (req, res) => {
                 await existing.save();
             }
 
-            const proceeds = parseFloat((numQty * numPrice).toFixed(2));
-            // Pipeline form: coerce null/undefined fundsAvailable to 100000, then credit proceeds.
+            const proceeds    = parseFloat((numQty * numPrice).toFixed(2));
+            // Credit proceeds in JS — no pipeline needed, compatible with Mongoose 9.
+            const newFunds    = parseFloat((currentFunds + proceeds).toFixed(2));
             const updatedUser = await UserModel.findByIdAndUpdate(
                 userId,
-                [{ $set: {
-                    fundsAvailable: {
-                        $add: [
-                            { $ifNull: ["$fundsAvailable", 100000] },
-                            proceeds
-                        ]
-                    }
-                }}],
+                { $set: { fundsAvailable: newFunds } },
                 { new: true }
             );
             if (!updatedUser) {
