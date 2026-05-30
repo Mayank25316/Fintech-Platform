@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, Navigate } from "react-router-dom";
 import Apps from "./Apps";
 import Funds from "./Funds";
 import Holdings from "./Holdings";
@@ -20,6 +20,9 @@ export default function Dashboard(){
           <Route path="/positions" element={<Positions />} />
           <Route path="/funds" element={<Funds/>} />
           <Route path="/apps" element={<Apps />} />
+          {/* Catch-all: redirect /api/* or any unknown path → dashboard home.
+              Prevents blank page when browser navigates to an API URL. */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
     </div>
