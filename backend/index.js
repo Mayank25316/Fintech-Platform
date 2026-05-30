@@ -55,6 +55,64 @@ const { userVerification } = require("./Middlewares/AuthMiddleware");
 
 app.get("/", (req, res) => { res.send("Hello World!"); });
 
+// ═══════════════════════════════════════════════════════════════════════════════
+//  IN-MEMORY CACHE  — prevents 429 from Yahoo Finance
+//
+//  Why we get 429:
+//    LiveDataContext polls /api/quotes every 5 s  →  12 Yahoo calls/minute/user
+//    Yahoo's unofficial API allows only a few calls per minute per server IP.
+//
+//  Solution — two-layer defence:
+//    1. TTL cache  : serve cached data if it is < QUOTE_TTL_MS old.
+//                    Default 60 s  →  1 Yahoo call/minute regardless of how many
+//                    browser tabs / users poll.
+//    2. Stale fallback: if Yahoo returns 429 but we have ANY cached data (even
+//                    old), return it so the UI stays functional.
+//    3. Static fallback: if cache is empty AND Yahoo fails, return hardcoded map.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const QUOTE_TTL_MS  = 60  * 1000;   // 60 seconds between real Yahoo calls
+const SEARCH_TTL_MS = 10  * 60 * 1000; // 10 minutes for search results
+
+// quoteCache  : { [sortedSymbols]: { data: pricesMap, ts: Date.now() } }
+// searchCache : { [query]:         { data: results[],  ts: Date.now() } }
+const quoteCache  = {};
+const searchCache = {};
+
+// Simple per-IP rate limiter for /api/quotes (protects against cold-cache storms)
+// Allows MAX_REQ_PER_WINDOW requests per IP per RATE_WINDOW_MS
+const RATE_WINDOW_MS      = 60 * 1000;  // 1 minute window
+const MAX_REQ_PER_WINDOW  = 4;          // max 4 calls/min/IP when cache is cold
+const ipHitMap = {};                    // { [ip]: { count, windowStart } }
+
+function checkRateLimit(ip) {
+    const now  = Date.now();
+    const hits = ipHitMap[ip];
+    if (!hits || now - hits.windowStart > RATE_WINDOW_MS) {
+        ipHitMap[ip] = { count: 1, windowStart: now };
+        return true;  // allowed
+    }
+    if (hits.count >= MAX_REQ_PER_WINDOW) return false; // blocked
+    hits.count++;
+    return true;
+}
+
+// Static fallback — always returned when Yahoo is completely unavailable
+const STATIC_FALLBACK = {
+    "^NSEI":   { price: 23002.15, change: 775.65,   changePercent: -3.26 },
+    "^BSESN":  { price: 74207.24, change: -2496.89, changePercent: -3.26 },
+    INFY:      { price: 1450.50,  change: 15.20,    changePercent:  1.25 },
+    TCS:       { price: 3850.00,  change: -12.50,   changePercent: -0.45 },
+    RELIANCE:  { price: 2900.20,  change: 25.10,    changePercent:  0.80 },
+    HUL:       { price: 2340.10,  change: -18.30,   changePercent: -1.10 },
+    WIPRO:     { price: 480.00,   change: 2.50,     changePercent:  0.50 },
+    ONGC:      { price: 275.40,   change: 3.20,     changePercent:  1.15 },
+    "M&M":     { price: 1950.00,  change: -5.00,    changePercent: -0.25 },
+    KPITTECH:  { price: 1420.00,  change: 10.00,    changePercent:  0.70 },
+    QUICKHEAL: { price: 540.20,   change: -2.10,    changePercent: -0.38 },
+};
+
+
 // ── Holdings Route ────────────────────────────────────────────────────────────
 // Per-user query via userId FK. Returns [] if none found — no side-effects.
 app.get("/api/holdings", userVerification, async (req, res) => {
@@ -389,12 +447,24 @@ app.post("/logout", (req, res) => {
     res.status(200).json({ success: true, message: "Logged out successfully" });
 });
 
-// ── Stock Search Route ────────────────────────────────────────────────────────
+// ── Stock Search Route — with 10-minute cache ─────────────────────────────────
 app.get("/api/search", async (req, res) => {
     try {
-        const query = req.query.q;
-        if (!query || query.trim().length < 1) return res.json({ success: true, results: [] });
-        const searchResult = await yahooFinance.search(query.trim(), { quotesCount: 20, newsCount: 0 });
+        const query = (req.query.q || "").trim();
+        if (!query) return res.json({ success: true, results: [] });
+
+        const cacheKey  = query.toLowerCase();
+        const cached    = searchCache[cacheKey];
+        const now       = Date.now();
+
+        // ── Return cache if fresh ────────────────────────────────────────────
+        if (cached && now - cached.ts < SEARCH_TTL_MS) {
+            console.log(`[CACHE-HIT] search: "${query}" (age ${Math.round((now - cached.ts) / 1000)}s)`);
+            return res.json({ success: true, results: cached.data, cached: true });
+        }
+
+        // ── Hit Yahoo Finance ────────────────────────────────────────────────
+        const searchResult  = await yahooFinance.search(query, { quotesCount: 20, newsCount: 0 });
         const indianResults = (searchResult.quotes || [])
             .filter((item) =>
                 item.symbol &&
@@ -409,21 +479,69 @@ app.get("/api/search", async (req, res) => {
                 exchange:   item.exchange || (item.symbol.endsWith(".NS") ? "NSE" : "BSE"),
                 type:       item.quoteType,
             }));
+
+        // Store in cache
+        searchCache[cacheKey] = { data: indianResults, ts: now };
+        console.log(`[CACHE-MISS] search: "${query}" — fetched ${indianResults.length} result(s) from Yahoo`);
+
         res.json({ success: true, results: indianResults });
     } catch (error) {
-        console.error("Search error:", error.message);
+        const is429 = error?.message?.includes("429") || error?.statusCode === 429;
+        console.error(`[Search] ${is429 ? "429 Too Many Requests" : "Error"}: ${error.message}`);
+        // Return stale cache on 429 if available
+        const cacheKey = (req.query.q || "").trim().toLowerCase();
+        const stale    = searchCache[cacheKey];
+        if (stale) {
+            console.warn("[Search] Serving stale cache as 429 fallback");
+            return res.json({ success: true, results: stale.data, stale: true });
+        }
         res.json({ success: false, fallback: true, results: [] });
     }
 });
 
-// ── Bulk Live Quotes Route ────────────────────────────────────────────────────
+// ── Bulk Live Quotes Route — with 60-second TTL cache + 429 fallback ──────────
+//
+// Flow:
+//   1. Cache HIT  (age < 60 s) → return immediately, skip Yahoo
+//   2. Cache MISS → check per-IP rate limit → call Yahoo
+//   3. Yahoo 429  → return stale cache if available, else STATIC_FALLBACK
+//   4. Yahoo OK   → store in cache, return fresh data
+//
 app.get("/api/quotes", async (req, res) => {
+    const symbolsString = req.query.symbols;
+    if (!symbolsString) return res.json({ success: false, message: "No symbols provided" });
+
+    // Normalise + sort symbols so "A,B" and "B,A" share the same cache slot
+    const symbolsArray = symbolsString.split(",").map(s => s.trim()).filter(Boolean).sort();
+    const cacheKey     = symbolsArray.join(",");
+    const now          = Date.now();
+    const cached       = quoteCache[cacheKey];
+
+    // ── 1. Cache HIT ──────────────────────────────────────────────────────────
+    if (cached && now - cached.ts < QUOTE_TTL_MS) {
+        const ageS = Math.round((now - cached.ts) / 1000);
+        console.log(`[CACHE-HIT] quotes (${symbolsArray.length} symbols, age ${ageS}s)`);
+        return res.json({ success: true, data: cached.data, cached: true, ageSeconds: ageS });
+    }
+
+    // ── 2. Per-IP rate limit check (only fires when cache is cold) ────────────
+    const clientIp = req.ip || req.socket?.remoteAddress || "unknown";
+    if (!checkRateLimit(clientIp)) {
+        console.warn(`[RATE-LIMIT] ${clientIp} exceeded ${MAX_REQ_PER_WINDOW} req/min for /api/quotes`);
+        // Return stale cache if we have ANY previous data
+        if (cached) {
+            const staleAgeS = Math.round((now - cached.ts) / 1000);
+            console.warn(`[RATE-LIMIT] Serving stale cache (age ${staleAgeS}s) to ${clientIp}`);
+            return res.json({ success: true, data: cached.data, stale: true, ageSeconds: staleAgeS });
+        }
+        return res.json({ success: true, data: STATIC_FALLBACK, fallback: true });
+    }
+
+    // ── 3. Call Yahoo Finance ─────────────────────────────────────────────────
     try {
-        const symbolsString = req.query.symbols;
-        if (!symbolsString) return res.json({ success: false, message: "No symbols provided" });
-        const symbolsArray = symbolsString.split(",");
-        const quotes       = await yahooFinance.quote(symbolsArray, { return: "array" });
-        const pricesMap    = {};
+        console.log(`[CACHE-MISS] quotes — calling Yahoo for ${symbolsArray.length} symbol(s)`);
+        const quotes    = await yahooFinance.quote(symbolsArray, { return: "array" });
+        const pricesMap = {};
         (Array.isArray(quotes) ? quotes : [quotes]).forEach((quote) => {
             if (quote && quote.symbol) {
                 const cleanSymbol = quote.symbol.replace(".NS", "").replace(".BO", "");
@@ -434,25 +552,32 @@ app.get("/api/quotes", async (req, res) => {
                 };
             }
         });
+
+        // Store fresh data in cache
+        quoteCache[cacheKey] = { data: pricesMap, ts: now };
+        console.log(`[CACHE-STORE] ${symbolsArray.length} symbol(s) cached for ${QUOTE_TTL_MS / 1000}s`);
+
         res.json({ success: true, data: pricesMap });
+
     } catch (error) {
-        console.error("Backend Error fetching bulk data:", error.message);
-        const fallbackPricesMap = {
-            "^NSEI":   { price: 23002.15, change: 775.65,   changePercent: -3.26 },
-            "^BSESN":  { price: 74207.24, change: -2496.89, changePercent: -3.26 },
-            INFY:      { price: 1450.50,  change: 15.20,    changePercent:  1.25 },
-            TCS:       { price: 3850.00,  change: -12.50,   changePercent: -0.45 },
-            RELIANCE:  { price: 2900.20,  change: 25.10,    changePercent:  0.80 },
-            HUL:       { price: 2340.10,  change: -18.30,   changePercent: -1.10 },
-            WIPRO:     { price: 480.00,   change: 2.50,     changePercent:  0.50 },
-            ONGC:      { price: 275.40,   change: 3.20,     changePercent:  1.15 },
-            "M&M":     { price: 1950.00,  change: -5.00,    changePercent: -0.25 },
-            KPITTECH:  { price: 1420.00,  change: 10.00,    changePercent:  0.70 },
-            QUICKHEAL: { price: 540.20,   change: -2.10,    changePercent: -0.38 },
-        };
-        res.json({ success: true, data: fallbackPricesMap });
+        // ── 4. Yahoo failed (429, network error, etc.) ────────────────────────
+        const is429     = error?.message?.includes("429") || error?.statusCode === 429;
+        const errorType = is429 ? "429 Too Many Requests" : error.message;
+        console.error(`[Quotes] Yahoo error: ${errorType}`);
+
+        // Prefer stale cache over static fallback (at least the symbols match)
+        if (cached) {
+            const staleAgeS = Math.round((now - cached.ts) / 1000);
+            console.warn(`[Quotes] 429 fallback: returning stale cache (age ${staleAgeS}s)`);
+            return res.json({ success: true, data: cached.data, stale: true, ageSeconds: staleAgeS });
+        }
+
+        // Last resort: static fallback map
+        console.warn("[Quotes] No cache available — returning static fallback");
+        res.json({ success: true, data: STATIC_FALLBACK, fallback: true });
     }
 });
+
 
 // ── DB connect → start server → register cron ─────────────────────────────────
 mongoose

@@ -31,7 +31,9 @@ export const LiveDataContextProvider = ({ children }) => {
         };
 
         fetchAllPrices();
-        const interval = setInterval(fetchAllPrices, 5000);
+        // Poll every 60 seconds — matches the backend's 60s TTL cache.
+        // Polling faster than 60s just returns cached data and wastes Yahoo API quota.
+        const interval = setInterval(fetchAllPrices, 60000);
         return () => clearInterval(interval);
     }, []);
 
