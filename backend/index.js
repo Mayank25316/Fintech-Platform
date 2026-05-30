@@ -10,9 +10,12 @@ const cron         = require("node-cron");
 const app          = express();
 const port         = process.env.PORT || 3000;
 const url          = process.env.MONGO_URL;
-// yahoo-finance2 v3 requires explicit instantiation — require().default was v2 syntax
-const { YahooFinance } = require("yahoo-finance2");
-const yahooFinance     = new YahooFinance();
+// yahoo-finance2 v3 CJS: the class is exported as .default (NOT as a named { YahooFinance }).
+// Destructuring `{ YahooFinance }` returns undefined → `new undefined()` crashes on startup.
+// Correct pattern per official UPGRADING.md: require().default → new it.
+const _yfModule    = require("yahoo-finance2");
+const YahooFinance = _yfModule.default ?? _yfModule;   // .default in v3; root fallback for safety
+const yahooFinance = new YahooFinance();
 const cookieParser = require("cookie-parser");
 const jwt          = require("jsonwebtoken");
 const bcrypt       = require("bcryptjs");
