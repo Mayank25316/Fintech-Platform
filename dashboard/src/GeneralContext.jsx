@@ -1,33 +1,50 @@
 import TradeWindow from "./TradeWindow";
-import { createContext, useState, useContext } from "react";
+import { createContext, useState, useContext, useCallback } from "react";
 
 const GeneralContext = createContext({
-    openTradeWindow: (stock, mode) => {},
-    closeTradeWindow: () => {},
+    openTradeWindow:   (stock, mode) => {},
+    closeTradeWindow:  () => {},
+    holdingsRefreshKey: 0,
 });
 
 export const GeneralContextProvider = ({ children }) => {
     const [isTradeWindowOpen,  setIsTradeWindowOpen]  = useState(false);
-    const [selectedStock,      setSelectedStock]       = useState(null);   // { name, price }
-    const [tradeMode,          setTradeMode]           = useState("BUY");  // "BUY" | "SELL"
-    // Increment this to trigger a Holdings re-fetch after a successful order
+    // selectedStock = { name, price, qty? }  — qty is the user's currently held qty
+    const [selectedStock,      setSelectedStock]       = useState(null);
+    const [tradeMode,          setTradeMode]           = useState("BUY");
+
+    // Incrementing this key triggers a re-fetch in Holdings.jsx
     const [holdingsRefreshKey, setHoldingsRefreshKey] = useState(0);
 
-    const handleOpenTradeWindow = (stock, mode = "BUY") => {
+    /**
+     * openTradeWindow
+     * @param {{ name: string, price: number, qty?: number }} stock
+     * @param {"BUY"|"SELL"} mode
+     *
+     * Passing `qty` from the holdings table lets TradeWindow show
+     * the held quantity in SELL mode and enforce the validation.
+     */
+    const handleOpenTradeWindow = useCallback((stock, mode = "BUY") => {
         setSelectedStock(stock);
         setTradeMode(mode);
         setIsTradeWindowOpen(true);
-    };
+    }, []);
 
-    const handleCloseTradeWindow = () => {
+    const handleCloseTradeWindow = useCallback(() => {
         setIsTradeWindowOpen(false);
         setSelectedStock(null);
-    };
+    }, []);
 
-    // Called by TradeWindow on a successful order → bumps the refresh key
-    const handleOrderSuccess = () => {
+    /**
+     * handleOrderSuccess
+     * Called by TradeWindow after a successful order.
+     * Always bumps holdingsRefreshKey to trigger a Holdings re-fetch;
+     * the updatedHolding / fundsAvailable are available here for future
+     * global-state optimistic patches if a TradingContext is added.
+     */
+    const handleOrderSuccess = useCallback((_updatedHolding, _fundsAvailable) => {
         setHoldingsRefreshKey((prev) => prev + 1);
-    };
+    }, []);
 
     return (
         <GeneralContext
@@ -40,10 +57,10 @@ export const GeneralContextProvider = ({ children }) => {
             {children}
             {isTradeWindowOpen && selectedStock && (
                 <TradeWindow
-                    stock={selectedStock}
+                    stock={selectedStock}           // includes qty for SELL validation
                     mode={tradeMode}
                     onClose={handleCloseTradeWindow}
-                    onSuccess={handleOrderSuccess}
+                    onSuccess={handleOrderSuccess}  // receives (updatedHolding, fundsAvailable)
                 />
             )}
         </GeneralContext>

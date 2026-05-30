@@ -164,19 +164,20 @@ app.post("/newOrder", userVerification, async (req, res) => {
 
         // 3. Update the Holding document for BUY orders
         //    (SELL holding updates are handled above)
+        let updatedHolding = null;
+
         if (mode === "BUY") {
             const existing = await HoldingsModel.findOne({ name, userId });
             if (existing) {
-                // Update average cost and quantity
                 const newQty = existing.qty + numQty;
                 const newAvg = ((existing.qty * existing.avg) + (numQty * numPrice)) / newQty;
                 existing.qty   = newQty;
                 existing.avg   = parseFloat(newAvg.toFixed(2));
                 existing.price = numPrice;
                 await existing.save();
+                updatedHolding = existing.toObject();
             } else {
-                // Create a brand-new holding document linked via userId
-                await HoldingsModel.create({
+                updatedHolding = await HoldingsModel.create({
                     name,
                     qty:    numQty,
                     avg:    numPrice,
@@ -186,10 +187,20 @@ app.post("/newOrder", userVerification, async (req, res) => {
                     isLoss: false,
                     userId,
                 });
+                updatedHolding = updatedHolding.toObject();
             }
+        } else if (mode === "SELL") {
+            // Return the remaining holding (null means fully liquidated)
+            updatedHolding = await HoldingsModel.findOne({ name, userId }) ?? null;
+            if (updatedHolding) updatedHolding = updatedHolding.toObject();
         }
 
-        res.json({ success: true, message: "Order placed successfully" });
+        res.json({
+            success: true,
+            message: "Order placed successfully",
+            updatedHolding,          // frontend uses this for immediate state patch
+            fundsAvailable: req.user.fundsAvailable,
+        });
     } catch (error) {
         console.error("Order error detail:", error);
         res.status(500).json({ success: false, message: `Server Error: ${error.message}` });

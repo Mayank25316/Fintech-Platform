@@ -78,8 +78,8 @@ export default function Holdings() {
         const currentPrice = livePrices[stock.name]
             ? livePrices[stock.name].price
             : stock.price;
-        // Opens with both BUY and SELL tabs visible — user picks their action
-        openTradeWindow({ name: stock.name, price: currentPrice }, "BUY");
+        // Pass qty so TradeWindow can show held quantity in SELL mode
+        openTradeWindow({ name: stock.name, price: currentPrice, qty: stock.qty }, "BUY");
     };
 
     return (
@@ -125,10 +125,9 @@ export default function Holdings() {
                                         <span
                                             id={`holding-${stock.name}`}
                                             style={{
-                                                cursor:          "pointer",
-                                                color:           "#2962ff",
-                                                fontWeight:      600,
-                                                textDecoration:  "underline dotted",
+                                                cursor:     "pointer",
+                                                color:      "#333333",
+                                                fontWeight: 600,
                                             }}
                                             title={`Click to trade ${stock.name}`}
                                             onClick={() => handleStockClick(stock)}
